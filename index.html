@@ -3,424 +3,548 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blue Square</title>
+    <title>Blue Square - Audio-Reactive Visual Art</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Courier New', monospace; background: #000; overflow: hidden; }
-        #canvas { display: block; }
-        #info {
-            position: absolute; top: 20px; left: 20px; color: white;
-            font-size: 14px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            user-select: none; z-index: 10; line-height: 1.6;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+        
+        body {
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vmin;
+            height: 100vmin;
+            max-width: 1200px;
+            max-height: 1200px;
+        }
+        
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
         #controls {
-            position: absolute; bottom: 20px; left: 20px; color: white;
-            font-size: 12px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-            user-select: none; z-index: 10; line-height: 1.8;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            max-width: 300px;
+            z-index: 100;
+            transition: opacity 0.3s;
         }
+        
+        #controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        
         .key {
-            display: inline-block; padding: 2px 6px;
-            background: rgba(255,255,255,0.2); border-radius: 3px; margin-right: 4px;
+            display: inline-block;
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 0 2px;
+            font-weight: bold;
+            color: #0ff;
         }
-        #loading {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; font-size: 24px; text-align: center;
+        
+        h3 {
+            color: #0ff;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .mode-indicator {
+            color: #ff0;
+            font-weight: bold;
+        }
+        
+        #startButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            font-size: 24px;
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            z-index: 200;
+            transition: all 0.3s;
+        }
+        
+        #startButton:hover {
+            background: #fff;
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+        
+        #startButton.hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <div id="loading">
-        <div>Loading Blue Square...</div>
-        <div id="loadProgress">0%</div>
+    <button id="startButton">Click to Start</button>
+    
+    <div id="container">
+        <canvas id="canvas" width="1200" height="1200"></canvas>
     </div>
-    <div id="info" style="display: none;">
-        <div><strong>BLUE SQUARE</strong></div>
-        <div>Mode: <span id="mode">Uniform</span></div>
-        <div>Preset: <span id="preset">-</span></div>
-        <div>Grid: <span id="cells">64</span> cells</div>
-        <div>Beat: <span id="beat">1/8</span></div>
+    
+    <div id="controls">
+        <h3>Controls</h3>
+        <div class="control-group">
+            <span class="key">M</span> Toggle Mode<br>
+            <span class="key">B</span> Toggle Background<br>
+            <span class="key">P</span> Pause<br>
+            <span class="key">I</span> Hide Info
+        </div>
+        <div class="control-group">
+            <span class="key">↑</span><span class="key">↓</span> BPM<br>
+            <span class="key">+</span><span class="key">-</span> Grid Size<br>
+            <span class="key">Scroll</span> Grid Size
+        </div>
+        <div class="control-group">
+            <strong>Mode 2 Presets:</strong><br>
+            <span class="key">1</span> Calm
+            <span class="key">2</span> Breathing<br>
+            <span class="key">3</span> Waves
+            <span class="key">4</span> Sparse<br>
+            <span class="key">5</span> Dense
+            <span class="key">6</span> Chaos<br>
+            <span class="key">7</span> Flicker
+        </div>
     </div>
-    <div id="controls" style="display: none;">
-        <div><span class="key">M</span> Mode | <span class="key">P</span> Pause | <span class="key">D</span> Background</div>
-        <div><span class="key">↑↓</span> Speed | <span class="key">←→</span> Add/Remove Cells | <span class="key">Wheel</span> Zoom</div>
-        <div><span class="key">1-7</span> Jump Preset (Mode 2 only)</div>
+    
+    <div id="info">
+        Mode: <span class="mode-indicator" id="modeText">Uniform</span> | 
+        Cells: <span id="cellCount">1</span> | 
+        BPM: <span id="bpmText">120</span> | 
+        BG: <span id="bgText">White</span>
     </div>
 
     <script>
-        const TOTAL_IMAGES = 230;
-        const BATCH_SIZE = 30;
-        const DEFAULT_CELLS = 1;
-        const FPS = 60;
-        const FRAMES_PER_BEAT = 30;
-        
-        let mode = 1;
-        let currentPreset = 0;
-        let cellCount = DEFAULT_CELLS;
-        let paused = false;
-        let animationSpeed = 1.0;
-        let scale = 1.0;
-        
-        let images = [];
-        let loadedImages = new Set();
-        let grid = [];
-        let cols = 0, rows = 0, cellSize = 0;
-        
-        // Mode 1: All cells show same uniform image
-        let uniformImage = 0;
-        let nextUniformImage = 0;
-        let uniformTransitioning = false;
-        let uniformTransitionProgress = 0;
-        
-        // Mode 2: Each cell independent with background
-        let backgroundImage = null;
-        
-        let frameCount = 0;
-        let beatCount = 0;
-        
-        // Background color
-        let backgroundColor = '#000';
-        
-        // Key press tracking for long press
-        let leftPressed = false;
-        let rightPressed = false;
-        let keyPressInterval = null;
-        
+        // Configuration
+        const CANVAS_SIZE = 1200;
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         
-        const presets = [
-            { name: 'Calm', speed: 0.3, changeRate: 0.1 },
-            { name: 'Breathing', speed: 0.6, changeRate: 0.2 },
-            { name: 'Waves', speed: 0.8, changeRate: 0.3 },
-            { name: 'Sparse', speed: 0.5, changeRate: 0.15 },
-            { name: 'Dense', speed: 1.0, changeRate: 0.4 },
-            { name: 'Energetic', speed: 1.5, changeRate: 0.5 },
-            { name: 'Glitch', speed: 2.0, changeRate: 0.7 }
-        ];
+        // State
+        let images = [];
+        let totalCells = 1;
+        let mode = 1; // 1 = Uniform, 2 = Random
+        let bpm = 120;
+        let paused = false;
+        let showInfo = true;
+        let canvasColor = '#FFFFFF';
+        let imageGrid = [];
+        let lastBeatTime = Date.now();
+        let beatInterval = 60000 / bpm;
+        let mode1BeatCounter = 0;
+        const MODE1_BEAT_INTERVAL = 8;
         
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            calculateLayout();
-        }
+        // Mode 2 state
+        let currentRandomMode = 0;
+        let mode2Cells = [];
+        let mode2Background = null;
+        let mode2BgTimer = 0;
+        let mode2Waves = [];
         
-        function calculateLayout() {
-            cols = Math.max(1, Math.ceil(Math.sqrt(cellCount)));
-            rows = Math.ceil(cellCount / cols);
-            const cellWidth = Math.floor(canvas.width / cols);
-            const cellHeight = Math.floor(canvas.height / rows);
-            cellSize = Math.min(cellWidth, cellHeight) * scale;
-            updateInfo();
-        }
+        // Random mode presets
+        const RANDOM_MODES = {
+            0: { name: 'Calm', minChange: 2.0, maxChange: 5.0, blankChance: 0.15, imageChance: 0.85, waveChance: 0.005, waveSize: [2, 4], waveSpeed: 200, bgChangeMin: 8.0, bgChangeMax: 15.0 },
+            1: { name: 'Breathing', minChange: 0.8, maxChange: 2.0, blankChance: 0.40, imageChance: 0.60, waveChance: 0.01, waveSize: [5, 15], waveSpeed: 150, bgChangeMin: 4.0, bgChangeMax: 8.0 },
+            2: { name: 'Waves', minChange: 1.5, maxChange: 4.0, blankChance: 0.30, imageChance: 0.70, waveChance: 0.05, waveSize: [8, 20], waveSpeed: 80, bgChangeMin: 3.0, bgChangeMax: 6.0 },
+            3: { name: 'Sparse', minChange: 1.0, maxChange: 3.0, blankChance: 0.70, imageChance: 0.30, waveChance: 0.02, waveSize: [3, 8], waveSpeed: 120, bgChangeMin: 5.0, bgChangeMax: 10.0 },
+            4: { name: 'Dense', minChange: 0.5, maxChange: 2.0, blankChance: 0.10, imageChance: 0.90, waveChance: 0.01, waveSize: [2, 5], waveSpeed: 100, bgChangeMin: 6.0, bgChangeMax: 12.0 },
+            5: { name: 'Chaos', minChange: 0.1, maxChange: 0.5, blankChance: 0.50, imageChance: 0.50, waveChance: 0.08, waveSize: [5, 15], waveSpeed: 40, bgChangeMin: 1.0, bgChangeMax: 3.0 },
+            6: { name: 'Flicker', minChange: 0.05, maxChange: 0.3, blankChance: 0.35, imageChance: 0.65, waveChance: 0.03, waveSize: [1, 3], waveSpeed: 30, bgChangeMin: 2.0, bgChangeMax: 5.0 }
+        };
         
-        async function loadImages() {
-            // Start app immediately - no waiting for images
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('info').style.display = 'block';
-            document.getElementById('controls').style.display = 'block';
-            initializeGrid();
-            animate();
-            
-            // Load images in background
-            for (let i = 1; i <= TOTAL_IMAGES; i++) {
-                const idx = i - 1;
-                const img = new Image();
-                img.onload = () => {
-                    images[idx] = img;
-                    loadedImages.add(idx);
-                };
-                img.onerror = () => {
-                    console.log(`Failed to load image ${i}`);
-                };
-                img.src = `images/blue-${i}.jpg`;
+        // Layout cache
+        let cachedCellSize = 0;
+        let cachedOffsetX = 0;
+        let cachedOffsetY = 0;
+        let rows = 1;
+        let cols = 1;
+        
+        // Generate placeholder images (blue themed)
+        function generateImages(count = 50) {
+            const hues = [200, 210, 220, 230, 240]; // Blue hues
+            for (let i = 0; i < count; i++) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 100;
+                tempCanvas.height = 100;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Create gradient or pattern
+                if (Math.random() > 0.5) {
+                    // Gradient
+                    const gradient = tempCtx.createLinearGradient(0, 0, 100, 100);
+                    const hue = hues[Math.floor(Math.random() * hues.length)];
+                    const sat = 60 + Math.random() * 40;
+                    const light = 40 + Math.random() * 30;
+                    gradient.addColorStop(0, `hsl(${hue}, ${sat}%, ${light}%)`);
+                    gradient.addColorStop(1, `hsl(${hue + 20}, ${sat + 10}%, ${light + 20}%)`);
+                    tempCtx.fillStyle = gradient;
+                    tempCtx.fillRect(0, 0, 100, 100);
+                } else {
+                    // Random shapes
+                    const hue = hues[Math.floor(Math.random() * hues.length)];
+                    tempCtx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+                    tempCtx.fillRect(0, 0, 100, 100);
+                    
+                    // Add circles
+                    for (let j = 0; j < 3; j++) {
+                        tempCtx.fillStyle = `hsl(${hue + 30}, 60%, ${40 + Math.random() * 20}%)`;
+                        tempCtx.beginPath();
+                        tempCtx.arc(Math.random() * 100, Math.random() * 100, 10 + Math.random() * 30, 0, Math.PI * 2);
+                        tempCtx.fill();
+                    }
+                }
+                
+                images.push(tempCanvas);
             }
         }
         
+        // Update layout
+        function updateLayout() {
+            cols = Math.max(1, Math.ceil(Math.sqrt(totalCells)));
+            rows = Math.ceil(totalCells / cols);
+            cachedCellSize = Math.min(Math.floor(CANVAS_SIZE / cols), Math.floor(CANVAS_SIZE / rows));
+            
+            const gridWidth = cols * cachedCellSize;
+            const gridHeight = rows * cachedCellSize;
+            cachedOffsetX = (CANVAS_SIZE - gridWidth) / 2;
+            cachedOffsetY = (CANVAS_SIZE - gridHeight) / 2;
+        }
+        
+        // Initialize grid
         function initializeGrid() {
-            uniformImage = Math.floor(Math.random() * TOTAL_IMAGES);
-            uniformTransitioning = false;
+            imageGrid = [];
+            const img = images[Math.floor(Math.random() * images.length)];
+            for (let i = 0; i < totalCells; i++) {
+                imageGrid.push(img);
+            }
+            updateLayout();
+        }
+        
+        // Initialize Mode 2
+        function initializeMode2() {
+            const settings = RANDOM_MODES[currentRandomMode];
+            mode2Cells = [];
             
-            backgroundImage = Math.random() < 0.4 ? null : Math.floor(Math.random() * TOTAL_IMAGES);
-            
-            grid = [];
-            for (let i = 0; i < cellCount; i++) {
-                grid.push({
-                    imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    nextImageIndex: 0,
-                    visible: Math.random() < 0.7,
-                    transitioning: false,
-                    transitionProgress: 0,
-                    updateOffset: Math.random() * 0.3
+            for (let i = 0; i < totalCells; i++) {
+                mode2Cells.push({
+                    image: images[Math.floor(Math.random() * images.length)],
+                    isBlank: false,
+                    timer: settings.minChange + Math.random() * (settings.maxChange - settings.minChange),
+                    inWave: false
                 });
             }
+            
+            mode2Background = images[Math.floor(Math.random() * images.length)];
+            mode2BgTimer = settings.bgChangeMin + Math.random() * (settings.bgChangeMax - settings.bgChangeMin);
+            mode2Waves = [];
         }
         
-        function addCell() {
-            if (cellCount < 400) {
-                cellCount++;
-                grid.push({
-                    imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    nextImageIndex: 0,
-                    visible: true,
-                    transitioning: false,
-                    transitionProgress: 0,
-                    updateOffset: Math.random() * 0.3
+        // Update Mode 2
+        function updateMode2(deltaSeconds) {
+            const settings = RANDOM_MODES[currentRandomMode];
+            
+            // Update background timer
+            mode2BgTimer -= deltaSeconds;
+            if (mode2BgTimer <= 0) {
+                mode2Background = images[Math.floor(Math.random() * images.length)];
+                mode2BgTimer = settings.bgChangeMin + Math.random() * (settings.bgChangeMax - settings.bgChangeMin);
+            }
+            
+            // Update waves
+            for (let i = mode2Waves.length - 1; i >= 0; i--) {
+                mode2Waves[i].position += settings.waveSpeed * deltaSeconds;
+                if (mode2Waves[i].position > cols + mode2Waves[i].size) {
+                    mode2Waves.splice(i, 1);
+                }
+            }
+            
+            // Maybe spawn new wave
+            if (Math.random() < settings.waveChance) {
+                mode2Waves.push({
+                    row: Math.floor(Math.random() * rows),
+                    position: 0,
+                    size: settings.waveSize[0] + Math.floor(Math.random() * (settings.waveSize[1] - settings.waveSize[0]))
                 });
-                calculateLayout();
             }
-        }
-        
-        function removeCell() {
-            if (cellCount > 1) {
-                cellCount--;
-                grid.pop();
-                calculateLayout();
-            }
-        }
-        
-        function updateUniform() {
-            frameCount++;
-            if (frameCount >= FRAMES_PER_BEAT / animationSpeed) {
-                frameCount = 0;
-                beatCount++;
+            
+            // Update cells
+            for (let idx = 0; idx < mode2Cells.length; idx++) {
+                const cell = mode2Cells[idx];
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
                 
-                if (beatCount % 8 === 0) {
-                    nextUniformImage = Math.floor(Math.random() * TOTAL_IMAGES);
-                    uniformTransitioning = true;
-                    uniformTransitionProgress = 0;
+                // Check if in wave
+                cell.inWave = false;
+                for (const wave of mode2Waves) {
+                    if (wave.row === row && wave.position <= col && col < wave.position + wave.size) {
+                        cell.inWave = true;
+                        cell.isBlank = true;
+                        break;
+                    }
                 }
-                updateInfo();
-            }
-            
-            if (uniformTransitioning) {
-                uniformTransitionProgress += 0.15;
-                if (uniformTransitionProgress >= 1.0) {
-                    uniformImage = nextUniformImage;
-                    uniformTransitioning = false;
-                    uniformTransitionProgress = 0;
-                }
-            }
-        }
-        
-        function updateRandom() {
-            frameCount++;
-            const preset = presets[currentPreset];
-            
-            if (frameCount >= FRAMES_PER_BEAT / (animationSpeed * preset.speed)) {
-                frameCount = 0;
-                beatCount++;
                 
-                for (let cell of grid) {
-                    if (Math.random() < (preset.changeRate + cell.updateOffset * 0.1)) {
-                        cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
-                        cell.transitioning = true;
-                        cell.transitionProgress = 0;
-                        cell.visible = Math.random() > 0.1;
-                    }
-                }
-                updateInfo();
-            }
-            
-            for (let cell of grid) {
-                if (cell.transitioning) {
-                    cell.transitionProgress += 0.12;
-                    if (cell.transitionProgress >= 1.0) {
-                        cell.imageIndex = cell.nextImageIndex;
-                        cell.transitioning = false;
-                        cell.transitionProgress = 0;
-                    }
-                }
-            }
-        }
-        
-        function draw() {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const offsetX = (canvas.width - (cellSize * cols)) / 2;
-            const offsetY = (canvas.height - (cellSize * rows)) / 2;
-            
-            if (mode === 1) {
-                // MODE 1: All cells show the SAME uniform image
-                const oldImg = images[uniformImage];
-                const newImg = images[nextUniformImage];
-                
-                for (let i = 0; i < cellCount; i++) {
-                    const col = i % cols;
-                    const row = Math.floor(i / cols);
-                    const x = offsetX + (col * cellSize);
-                    const y = offsetY + (row * cellSize);
-                    
-                    if (uniformTransitioning && loadedImages.has(uniformImage) && loadedImages.has(nextUniformImage)) {
-                        ctx.globalAlpha = 1.0 - uniformTransitionProgress;
-                        ctx.drawImage(oldImg, x, y, cellSize, cellSize);
-                        ctx.globalAlpha = uniformTransitionProgress;
-                        ctx.drawImage(newImg, x, y, cellSize, cellSize);
-                        ctx.globalAlpha = 1.0;
-                    } else if (loadedImages.has(uniformImage)) {
-                        ctx.drawImage(oldImg, x, y, cellSize, cellSize);
-                    } else {
-                        // Show blue placeholder
-                        ctx.fillStyle = '#4169e1';
-                        ctx.fillRect(x, y, cellSize, cellSize);
-                    }
-                }
-            } else {
-                // MODE 2: Each cell independent with background
-                for (let i = 0; i < grid.length && i < cellCount; i++) {
-                    const cell = grid[i];
-                    const col = i % cols;
-                    const row = Math.floor(i / cols);
-                    const x = offsetX + (col * cellSize);
-                    const y = offsetY + (row * cellSize);
-                    
-                    if (!cell.visible) {
-                        if (backgroundImage !== null && loadedImages.has(backgroundImage)) {
-                            const bgImg = images[backgroundImage];
-                            ctx.drawImage(bgImg, x, y, cellSize, cellSize);
-                        }
-                        continue;
-                    }
-                    
-                    if (cell.transitioning) {
-                        const oldImg = images[cell.imageIndex];
-                        const newImg = images[cell.nextImageIndex];
-                        if (loadedImages.has(cell.imageIndex)) {
-                            ctx.globalAlpha = 1.0 - cell.transitionProgress;
-                            ctx.drawImage(oldImg, x, y, cellSize, cellSize);
-                        }
-                        if (loadedImages.has(cell.nextImageIndex)) {
-                            ctx.globalAlpha = cell.transitionProgress;
-                            ctx.drawImage(newImg, x, y, cellSize, cellSize);
-                        }
-                        if (!loadedImages.has(cell.imageIndex) && !loadedImages.has(cell.nextImageIndex)) {
-                            // Show blue placeholder
-                            ctx.fillStyle = '#4169e1';
-                            ctx.fillRect(x, y, cellSize, cellSize);
-                        }
-                        ctx.globalAlpha = 1.0;
-                    } else {
-                        if (loadedImages.has(cell.imageIndex)) {
-                            const img = images[cell.imageIndex];
-                            ctx.drawImage(img, x, y, cellSize, cellSize);
+                // Update timer
+                if (!cell.inWave) {
+                    cell.timer -= deltaSeconds;
+                    if (cell.timer <= 0) {
+                        const rand = Math.random();
+                        if (rand < settings.blankChance) {
+                            cell.isBlank = true;
+                            cell.image = null;
                         } else {
-                            // Show blue placeholder
-                            ctx.fillStyle = '#4169e1';
-                            ctx.fillRect(x, y, cellSize, cellSize);
+                            cell.isBlank = false;
+                            cell.image = images[Math.floor(Math.random() * images.length)];
                         }
+                        cell.timer = settings.minChange + Math.random() * (settings.maxChange - settings.minChange);
                     }
                 }
             }
         }
         
-        function animate() {
-            if (!paused) {
-                if (mode === 1) updateUniform();
-                else updateRandom();
+        // Draw grid
+        function drawGrid() {
+            // Fill background
+            ctx.fillStyle = canvasColor;
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            
+            for (let idx = 0; idx < totalCells; idx++) {
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
+                const x = cachedOffsetX + col * cachedCellSize;
+                const y = cachedOffsetY + row * cachedCellSize;
+                
+                let imgToDraw = null;
+                
+                if (mode === 2 && idx < mode2Cells.length) {
+                    const cell = mode2Cells[idx];
+                    if (cell.isBlank) {
+                        imgToDraw = mode2Background;
+                    } else {
+                        imgToDraw = cell.image;
+                    }
+                } else {
+                    imgToDraw = imageGrid[idx];
+                }
+                
+                if (imgToDraw) {
+                    ctx.drawImage(imgToDraw, x, y, cachedCellSize, cachedCellSize);
+                }
             }
-            draw();
+        }
+        
+        // Update UI
+        function updateUI() {
+            document.getElementById('modeText').textContent = mode === 1 ? 'Uniform' : `Random (${RANDOM_MODES[currentRandomMode].name})`;
+            document.getElementById('cellCount').textContent = totalCells;
+            document.getElementById('bpmText').textContent = bpm;
+            document.getElementById('bgText').textContent = canvasColor === '#FFFFFF' ? 'White' : 'Black';
+            
+            if (!showInfo) {
+                document.getElementById('info').style.display = 'none';
+                document.getElementById('controls').classList.add('hidden');
+            } else {
+                document.getElementById('info').style.display = 'block';
+                document.getElementById('controls').classList.remove('hidden');
+            }
+        }
+        
+        // Animation loop
+        let lastFrameTime = Date.now();
+        function animate() {
+            const now = Date.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+            const deltaSeconds = delta / 1000;
+            
+            if (!paused) {
+                // Beat detection
+                if (now - lastBeatTime >= beatInterval) {
+                    lastBeatTime = now;
+                    
+                    if (mode === 1) {
+                        mode1BeatCounter++;
+                        if (mode1BeatCounter >= MODE1_BEAT_INTERVAL) {
+                            mode1BeatCounter = 0;
+                            const newImage = images[Math.floor(Math.random() * images.length)];
+                            for (let i = 0; i < totalCells; i++) {
+                                imageGrid[i] = newImage;
+                            }
+                        }
+                    }
+                }
+                
+                // Update Mode 2
+                if (mode === 2) {
+                    updateMode2(deltaSeconds);
+                }
+            }
+            
+            drawGrid();
+            updateUI();
+            
             requestAnimationFrame(animate);
         }
         
-        function updateInfo() {
-            document.getElementById('mode').textContent = mode === 1 ? 'Uniform' : 'Random';
-            document.getElementById('preset').textContent = mode === 2 ? presets[currentPreset].name : '-';
-            document.getElementById('cells').textContent = cellCount;
-            document.getElementById('beat').textContent = `${(beatCount % 8) + 1}/8`;
+        // Set grid size
+        function setGridSize(newSize) {
+            newSize = Math.max(1, Math.min(1000, newSize));
+            if (newSize === totalCells) return;
+            
+            totalCells = newSize;
+            
+            if (mode === 1) {
+                const currentImage = imageGrid[0] || images[0];
+                imageGrid = [];
+                for (let i = 0; i < totalCells; i++) {
+                    imageGrid.push(currentImage);
+                }
+            } else if (mode === 2) {
+                initializeMode2();
+            }
+            
+            updateLayout();
         }
         
+        // Toggle mode
+        function toggleMode() {
+            if (mode === 1) {
+                mode = 2;
+                initializeMode2();
+            } else {
+                mode = 1;
+                const newImage = images[Math.floor(Math.random() * images.length)];
+                imageGrid = [];
+                for (let i = 0; i < totalCells; i++) {
+                    imageGrid.push(newImage);
+                }
+                mode1BeatCounter = 0;
+            }
+        }
+        
+        // Keyboard controls
         document.addEventListener('keydown', (e) => {
             switch(e.key.toLowerCase()) {
                 case 'm':
-                    mode = mode === 1 ? 2 : 1;
-                    frameCount = 0;
-                    beatCount = 0;
-                    updateInfo();
+                    toggleMode();
+                    break;
+                case 'b':
+                    canvasColor = canvasColor === '#FFFFFF' ? '#000000' : '#FFFFFF';
                     break;
                 case 'p':
                     paused = !paused;
                     break;
-                case 'd':
-                    backgroundColor = backgroundColor === '#000' ? '#fff' : '#000';
-                    break;
-                case 'arrowleft':
-                    if (!leftPressed) {
-                        leftPressed = true;
-                        removeCell();
-                        // Start long press after 300ms
-                        setTimeout(() => {
-                            if (leftPressed && !keyPressInterval) {
-                                keyPressInterval = setInterval(() => {
-                                    if (leftPressed) removeCell();
-                                }, 50);
-                            }
-                        }, 300);
-                    }
-                    break;
-                case 'arrowright':
-                    if (!rightPressed) {
-                        rightPressed = true;
-                        addCell();
-                        // Start long press after 300ms
-                        setTimeout(() => {
-                            if (rightPressed && !keyPressInterval) {
-                                keyPressInterval = setInterval(() => {
-                                    if (rightPressed) addCell();
-                                }, 50);
-                            }
-                        }, 300);
-                    }
+                case 'i':
+                    showInfo = !showInfo;
                     break;
                 case 'arrowup':
-                    animationSpeed = Math.min(5.0, animationSpeed + 0.2);
+                    bpm = Math.min(300, bpm + 5);
+                    beatInterval = 60000 / bpm;
+                    if (mode === 2) initializeMode2();
                     break;
                 case 'arrowdown':
-                    animationSpeed = Math.max(0.1, animationSpeed - 0.2);
+                    bpm = Math.max(30, bpm - 5);
+                    beatInterval = 60000 / bpm;
+                    if (mode === 2) initializeMode2();
                     break;
-                case '1': case '2': case '3': case '4': case '5': case '6': case '7':
-                    if (mode === 2) {
-            // Zoom in/out
-            if (e.deltaY < 0) {
-                scale = Math.min(2.0, scale + 0.05);
-            } else {
-                scale = Math.max(0.3, scale - 0.05);
-            }t') {
-                rightPressed = false;
-                if (keyPressInterval) {
-                    clearInterval(keyPressInterval);
-                    keyPressInterval = null;
-                }
+                case '+':
+                case '=':
+                    setGridSize(totalCells + 1);
+                    break;
+                case '-':
+                case '_':
+                    setGridSize(totalCells - 1);
+                    break;
+                case '1':
+                    currentRandomMode = 0;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '2':
+                    currentRandomMode = 1;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '3':
+                    currentRandomMode = 2;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '4':
+                    currentRandomMode = 3;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '5':
+                    currentRandomMode = 4;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '6':
+                    currentRandomMode = 5;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '7':
+                    currentRandomMode = 6;
+                    if (mode === 2) initializeMode2();
+                    break;
             }
         });
         
-        document.addEventListener('wheel', (e) => {
+        // Mouse wheel control
+        canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            if (e.deltaY < 0) {
-                cellCount = Math.min(400, cellCount + 4);
-            } else {
-                cellCount = Math.max(4, cellCount - 4);
-            }
-            while (grid.length < cellCount) {
-                grid.push({
-                    imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    nextImageIndex: 0,
-                    visible: true,
-                    transitioning: false,
-                    transitionProgress: 0,
-                    updateOffset: Math.random() * 0.3
-                });
-            }
-            grid.length = cellCount;
-            calculateLayout();
+            const direction = e.deltaY > 0 ? -1 : 1;
+            setGridSize(totalCells + direction);
         });
         
-        window.addEventListener('resize', resizeCanvas);
-        
-        resizeCanvas();
-        loadImages();
+        // Start button
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('startButton').classList.add('hidden');
+            generateImages(230); // Match the number of images from Pi version
+            initializeGrid();
+            animate();
+        });
     </script>
 </body>
 </html>
-        
-        

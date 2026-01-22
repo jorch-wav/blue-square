@@ -138,6 +138,7 @@
         <div class="control-group">
             <span class="key">←</span><span class="key">→</span> Add/Remove Cells<br>
             <span class="key">Shift</span><span class="key">←</span><span class="key">→</span> Square Grid (1x1, 2x2, 3x3...)<br>
+            <span class="key">↑</span><span class="key">↓</span> BPM (Speed)<br>
             <span class="key">Scroll</span> Zoom In/Out
         </div>
         <div class="control-group">
@@ -473,14 +474,29 @@
         // Toggle mode
         function toggleMode() {
             if (mode === 1) {
+                // Uniform -> Random: preserve current uniform image across all cells
                 mode = 2;
+                const uniformImg = imageGrid[0] || images[0];
                 initializeMode2();
+                // Set all mode2 cells to show the uniform image initially
+                for (let i = 0; i < mode2Cells.length; i++) {
+                    mode2Cells[i].image = uniformImg;
+                    mode2Cells[i].isBlank = false;
+                }
             } else {
+                // Random -> Uniform: use the most common image from mode2 cells
                 mode = 1;
-                const newImage = images[Math.floor(Math.random() * images.length)];
+                // Take image from first non-blank cell, or random if all blank
+                let transitionImage = images[Math.floor(Math.random() * images.length)];
+                for (let i = 0; i < mode2Cells.length; i++) {
+                    if (!mode2Cells[i].isBlank && mode2Cells[i].image) {
+                        transitionImage = mode2Cells[i].image;
+                        break;
+                    }
+                }
                 imageGrid = [];
                 for (let i = 0; i < totalCells; i++) {
-                    imageGrid.push(newImage);
+                    imageGrid.push(transitionImage);
                 }
                 mode1BeatCounter = 0;
             }
@@ -528,6 +544,19 @@
                         setGridSize(1);
                         isReset = true;
                     }
+                    break;
+                case 'arrowup':
+                    e.preventDefault();
+                    bpm = Math.min(300, bpm + 5);
+                    beatInterval = 60000 / bpm;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case 'arrowdown':
+                    e.preventDefault();
+                    bpm = Math.max(30, bpm - 5);
+                    beatInterval = 60000 / bpm;
+                    if (mode === 2) initializeMode2();
+                    break;
                     break;
                 case 'arrowleft':
                     e.preventDefault();

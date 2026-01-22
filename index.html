@@ -132,7 +132,8 @@
             <span class="key">M</span> Toggle Mode<br>
             <span class="key">D</span> Toggle Background<br>
             <span class="key">P</span> Pause<br>
-            <span class="key">I</span> Hide Info
+            <span class="key">I</span> Hide Info<br>
+            <span class="key">R</span> Reset/Restore
         </div>
         <div class="control-group">
             <span class="key">←</span><span class="key">→</span> Add/Remove Cells<br>
@@ -191,6 +192,8 @@
         let beatInterval = 60000 / bpm;
         let mode1BeatCounter = 0;
         let zoomLevel = 1.0; // Zoom state (0.1 = small grid, 1.0 = full screen height)
+        let previousCellCount = 1; // Store cell count before reset
+        let isReset = false; // Track if currently in reset state
         const MODE1_BEAT_INTERVAL = 8;
         
         // Mode 2 state
@@ -449,6 +452,10 @@
             if (newSize === totalCells) return;
             
             totalCells = newSize;
+            // Clear reset flag when manually changing grid size
+            if (totalCells !== 1) {
+                isReset = false;
+            }
             
             if (mode === 1) {
                 const currentImage = imageGrid[0] || images[0];
@@ -496,6 +503,18 @@
                     break;
                 case 'i':
                     showInfo = !showInfo;
+                    break;
+                case 'r':
+                    if (isReset) {
+                        // Restore previous configuration
+                        setGridSize(previousCellCount);
+                        isReset = false;
+                    } else {
+                        // Save current config and reset to 1 cell
+                        previousCellCount = totalCells;
+                        setGridSize(1);
+                        isReset = true;
+                    }
                     break;
                 case 'arrowleft':
                     e.preventDefault();

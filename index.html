@@ -51,6 +51,8 @@
         const TOTAL_IMAGES = 230;
         const BATCH_SIZE = 30; // Load 30 at a time
         const DEFAULT_CELLS = 64;
+        const FPS = 60;
+        const FRAMES_PER_BEAT = 30; // 30 frames = 0.5 sec at 60fps = 120 BPM
         
         let mode = 1;
         let currentPreset = 0;
@@ -64,9 +66,8 @@
         let grid = [];
         let cols = 0, rows = 0, cellSize = 0;
         
-        let beatInterval = 500;
+        let frameCount = 0;
         let beatCount = 0;
-        let lastBeatTime = Date.now();
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -151,40 +152,109 @@
             for (let i = 0; i < cellCount; i++) {
                 grid.push({
                     imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    visible: true
+                    nextImageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
+                    visible: true,
+                    alpha: 1.0,
+                    transitioning: false,
+                    transitionProgress: 0,
+                    updateOffset: Math.random() * 0.3 // 0-30% offset for organic feel
                 });
             }
         }
         
         function updateUniform() {
-            const now = Date.now();
-            if (now - lastBeatTime >= beatInterval / animationSpeed) {
-                lastBeatTime = now;
+            frameCount++;
+            
+            const framesPerBeat = FRAMES_PER_BEAT / animationSpeed;
+            
+            if (frameCount >= framesPerBeat) {
+                frameCount = 0;
                 beatCount++;
                 
                 if (beatCount % 8 === 0) {
+                    // Start transition for all cells with slight offset
                     for (let cell of grid) {
-                        cell.imageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
+                        cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
+                        cell.transitioning = true;
+                        cell.transitionProgress = 0;
                     }
                 }
                 updateInfo();
             }
+            
+            // Update transitions smoothly
+            for (let cell of grid) {
+                if (cell.transitioning) {
+                    cell.transitionProgress += 0.15; // Smooth fade speed
+                    
+                    if (cell.transitionProgress >= 1.0) {
+                        cell.imageIndex = cell.nextImageIndex;
+                        cell.transitioning = false;
+                        cell.transitionProgress = 0;
+                        cell.alpha = 1.0;
+                    }
+                }
+            }
         }
         
         function updateRandom() {
-            const now = Date.now();
-            if (now - lastBeatTime >= beatInterval / (animationSpeed * presets[currentPreset].speed)) {
-                lastBeatTime = now;
+            frameCount++;
+            
+            const preset = presets[currentPreset];
+            const framesPerBeat = FRAMES_PER_BEAT / (animationSpeed * preset.speed);
+            
+            if (frameCount >= framesPerBeat) {
+                frameCount = 0;
                 beatCount++;
                 
-                const preset = presets[currentPreset];
-                for (let cell of grid) {
-                    if (Math.random() < preset.changeRate) {
-                        cell.imageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
-                        cell.visible = Math.random() > 0.1; // 10% blank chance
+                for (let i = 0; i < grid.length; i++) {
+                    const cell = grid[i];
+                    // Use cell's offset for organic timing
+                    const shouldUpdate = Math.random() < (preset.changeRate + cell.updateOffset * 0.1);
+                    
+                    if (shouldUpdate) {
+                        cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
+                        cell.transitioning = true;
+                        cell.transitionProgress = 0;
+                        cell.visible = Math.random() > 0.1;
                     }
                 }
                 updateInfo();
+            }
+            
+            // Update transitions
+            for (let cell of grid) {
+                if (cell.transitioning) {
+                    cell.transitionProgress += 0.12;
+                    
+                    if (cell.transitionProgress >= 1.0) {
+                        cell.imageIndex = cell.nextImageIndex;
+                        cell.transitioning = false;
+                if (cell.transitioning) {
+                    // Cross-fade between old and new image
+                    const oldImg = images[cell.imageIndex];
+                    const newImg = images[cell.nextImageIndex];
+                    
+                    // Draw old image fading out
+                    if (oldImg) {
+                        ctx.globalAlpha = 1.0 - cell.transitionProgress;
+                        ctx.drawImage(oldImg, x, y, cellSize, cellSize);
+                    }
+                    
+                    // Draw new image fading in
+                    if (newImg) {
+                        ctx.globalAlpha = cell.transitionProgress;
+                        ctx.drawImage(newImg, x, y, cellSize, cellSize);
+                    }
+                    
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    // Draw current image normally
+                    const img = images[cell.imageIndex];
+                    if (img) {
+                        ctx.drawImage(img, x, y, cellSize, cellSize);
+                    }
+                }
             }
         }
         
@@ -263,7 +333,12 @@
                 case '-':
                 case '_':
                     scale = Math.max(0.3, scale - 0.1);
-                    calculateLayout();
+                    nextImageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
+                    visible: true,
+                    alpha: 1.0,
+                    transitioning: false,
+                    transitionProgress: 0,
+                    updateOffset: Math.random() * 0.3ut();
                     break;
                 case '1': case '2': case '3': case '4': case '5': case '6': case '7':
                     if (mode === 2) {

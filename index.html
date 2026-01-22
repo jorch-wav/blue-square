@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue Square - Audio-Reactive Visual Art</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vmin;
+            height: 100vmin;
+            max-width: 1200px;
+            max-height: 1200px;
+        }
+        
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        #controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            max-width: 300px;
+            z-index: 100;
+            transition: opacity 0.3s;
+        }
+        
+        #controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        
+        .key {
+            display: inline-block;
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin: 0 2px;
+            font-weight: bold;
+            color: #0ff;
+        }
+        
+        h3 {
+            color: #0ff;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .mode-indicator {
+            color: #ff0;
+            font-weight: bold;
+        }
+        
+        #startButton {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            font-size: 24px;
+            background: #0ff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            z-index: 200;
+            transition: all 0.3s;
+        }
+        
+        #startButton:hover {
+            background: #fff;
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+        
+        #startButton.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <button id="startButton">Click to Start</button>
+    
+    <div id="container">
+        <canvas id="canvas" width="1200" height="1200"></canvas>
+    </div>
+    
+    <div id="controls">
+        <h3>Controls</h3>
+        <div class="control-group">
+            <span class="key">M</span> Toggle Mode<br>
+            <span class="key">B</span> Toggle Background<br>
+            <span class="key">P</span> Pause<br>
+            <span class="key">I</span> Hide Info
+        </div>
+        <div class="control-group">
+            <span class="key">↑</span><span class="key">↓</span> BPM<br>
+            <span class="key">+</span><span class="key">-</span> Grid Size<br>
+            <span class="key">Scroll</span> Grid Size
+        </div>
+        <div class="control-group">
+            <strong>Mode 2 Presets:</strong><br>
+            <span class="key">1</span> Calm
+            <span class="key">2</span> Breathing<br>
+            <span class="key">3</span> Waves
+            <span class="key">4</span> Sparse<br>
+            <span class="key">5</span> Dense
+            <span class="key">6</span> Chaos<br>
+            <span class="key">7</span> Flicker
+        </div>
+    </div>
+    
+    <div id="info">
+        Mode: <span class="mode-indicator" id="modeText">Uniform</span> | 
+        Cells: <span id="cellCount">1</span> | 
+        BPM: <span id="bpmText">120</span> | 
+        BG: <span id="bgText">White</span>
+    </div>
+
+    <script>
+        // Configuration
+        const CANVAS_SIZE = 1200;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        
+        // State
+        let images = [];
+        let totalCells = 1;
+        let mode = 1; // 1 = Uniform, 2 = Random
+        let bpm = 120;
+        let paused = false;
+        let showInfo = true;
+        let canvasColor = '#FFFFFF';
+        let imageGrid = [];
+        let lastBeatTime = Date.now();
+        let beatInterval = 60000 / bpm;
+        let mode1BeatCounter = 0;
+        const MODE1_BEAT_INTERVAL = 8;
+        
+        // Mode 2 state
+        let currentRandomMode = 0;
+        let mode2Cells = [];
+        let mode2Background = null;
+        let mode2BgTimer = 0;
+        let mode2Waves = [];
+        
+        // Random mode presets
+        const RANDOM_MODES = {
+            0: { name: 'Calm', minChange: 2.0, maxChange: 5.0, blankChance: 0.15, imageChance: 0.85, waveChance: 0.005, waveSize: [2, 4], waveSpeed: 200, bgChangeMin: 8.0, bgChangeMax: 15.0 },
+            1: { name: 'Breathing', minChange: 0.8, maxChange: 2.0, blankChance: 0.40, imageChance: 0.60, waveChance: 0.01, waveSize: [5, 15], waveSpeed: 150, bgChangeMin: 4.0, bgChangeMax: 8.0 },
+            2: { name: 'Waves', minChange: 1.5, maxChange: 4.0, blankChance: 0.30, imageChance: 0.70, waveChance: 0.05, waveSize: [8, 20], waveSpeed: 80, bgChangeMin: 3.0, bgChangeMax: 6.0 },
+            3: { name: 'Sparse', minChange: 1.0, maxChange: 3.0, blankChance: 0.70, imageChance: 0.30, waveChance: 0.02, waveSize: [3, 8], waveSpeed: 120, bgChangeMin: 5.0, bgChangeMax: 10.0 },
+            4: { name: 'Dense', minChange: 0.5, maxChange: 2.0, blankChance: 0.10, imageChance: 0.90, waveChance: 0.01, waveSize: [2, 5], waveSpeed: 100, bgChangeMin: 6.0, bgChangeMax: 12.0 },
+            5: { name: 'Chaos', minChange: 0.1, maxChange: 0.5, blankChance: 0.50, imageChance: 0.50, waveChance: 0.08, waveSize: [5, 15], waveSpeed: 40, bgChangeMin: 1.0, bgChangeMax: 3.0 },
+            6: { name: 'Flicker', minChange: 0.05, maxChange: 0.3, blankChance: 0.35, imageChance: 0.65, waveChance: 0.03, waveSize: [1, 3], waveSpeed: 30, bgChangeMin: 2.0, bgChangeMax: 5.0 }
+        };
+        
+        // Layout cache
+        let cachedCellSize = 0;
+        let cachedOffsetX = 0;
+        let cachedOffsetY = 0;
+        let rows = 1;
+        let cols = 1;
+        
+        // Generate placeholder images (blue themed)
+        function generateImages(count = 50) {
+            const hues = [200, 210, 220, 230, 240]; // Blue hues
+            for (let i = 0; i < count; i++) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 100;
+                tempCanvas.height = 100;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Create gradient or pattern
+                if (Math.random() > 0.5) {
+                    // Gradient
+                    const gradient = tempCtx.createLinearGradient(0, 0, 100, 100);
+                    const hue = hues[Math.floor(Math.random() * hues.length)];
+                    const sat = 60 + Math.random() * 40;
+                    const light = 40 + Math.random() * 30;
+                    gradient.addColorStop(0, `hsl(${hue}, ${sat}%, ${light}%)`);
+                    gradient.addColorStop(1, `hsl(${hue + 20}, ${sat + 10}%, ${light + 20}%)`);
+                    tempCtx.fillStyle = gradient;
+                    tempCtx.fillRect(0, 0, 100, 100);
+                } else {
+                    // Random shapes
+                    const hue = hues[Math.floor(Math.random() * hues.length)];
+                    tempCtx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+                    tempCtx.fillRect(0, 0, 100, 100);
+                    
+                    // Add circles
+                    for (let j = 0; j < 3; j++) {
+                        tempCtx.fillStyle = `hsl(${hue + 30}, 60%, ${40 + Math.random() * 20}%)`;
+                        tempCtx.beginPath();
+                        tempCtx.arc(Math.random() * 100, Math.random() * 100, 10 + Math.random() * 30, 0, Math.PI * 2);
+                        tempCtx.fill();
+                    }
+                }
+                
+                images.push(tempCanvas);
+            }
+        }
+        
+        // Update layout
+        function updateLayout() {
+            cols = Math.max(1, Math.ceil(Math.sqrt(totalCells)));
+            rows = Math.ceil(totalCells / cols);
+            cachedCellSize = Math.min(Math.floor(CANVAS_SIZE / cols), Math.floor(CANVAS_SIZE / rows));
+            
+            const gridWidth = cols * cachedCellSize;
+            const gridHeight = rows * cachedCellSize;
+            cachedOffsetX = (CANVAS_SIZE - gridWidth) / 2;
+            cachedOffsetY = (CANVAS_SIZE - gridHeight) / 2;
+        }
+        
+        // Initialize grid
+        function initializeGrid() {
+            imageGrid = [];
+            const img = images[Math.floor(Math.random() * images.length)];
+            for (let i = 0; i < totalCells; i++) {
+                imageGrid.push(img);
+            }
+            updateLayout();
+        }
+        
+        // Initialize Mode 2
+        function initializeMode2() {
+            const settings = RANDOM_MODES[currentRandomMode];
+            mode2Cells = [];
+            
+            for (let i = 0; i < totalCells; i++) {
+                mode2Cells.push({
+                    image: images[Math.floor(Math.random() * images.length)],
+                    isBlank: false,
+                    timer: settings.minChange + Math.random() * (settings.maxChange - settings.minChange),
+                    inWave: false
+                });
+            }
+            
+            mode2Background = images[Math.floor(Math.random() * images.length)];
+            mode2BgTimer = settings.bgChangeMin + Math.random() * (settings.bgChangeMax - settings.bgChangeMin);
+            mode2Waves = [];
+        }
+        
+        // Update Mode 2
+        function updateMode2(deltaSeconds) {
+            const settings = RANDOM_MODES[currentRandomMode];
+            
+            // Update background timer
+            mode2BgTimer -= deltaSeconds;
+            if (mode2BgTimer <= 0) {
+                mode2Background = images[Math.floor(Math.random() * images.length)];
+                mode2BgTimer = settings.bgChangeMin + Math.random() * (settings.bgChangeMax - settings.bgChangeMin);
+            }
+            
+            // Update waves
+            for (let i = mode2Waves.length - 1; i >= 0; i--) {
+                mode2Waves[i].position += settings.waveSpeed * deltaSeconds;
+                if (mode2Waves[i].position > cols + mode2Waves[i].size) {
+                    mode2Waves.splice(i, 1);
+                }
+            }
+            
+            // Maybe spawn new wave
+            if (Math.random() < settings.waveChance) {
+                mode2Waves.push({
+                    row: Math.floor(Math.random() * rows),
+                    position: 0,
+                    size: settings.waveSize[0] + Math.floor(Math.random() * (settings.waveSize[1] - settings.waveSize[0]))
+                });
+            }
+            
+            // Update cells
+            for (let idx = 0; idx < mode2Cells.length; idx++) {
+                const cell = mode2Cells[idx];
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
+                
+                // Check if in wave
+                cell.inWave = false;
+                for (const wave of mode2Waves) {
+                    if (wave.row === row && wave.position <= col && col < wave.position + wave.size) {
+                        cell.inWave = true;
+                        cell.isBlank = true;
+                        break;
+                    }
+                }
+                
+                // Update timer
+                if (!cell.inWave) {
+                    cell.timer -= deltaSeconds;
+                    if (cell.timer <= 0) {
+                        const rand = Math.random();
+                        if (rand < settings.blankChance) {
+                            cell.isBlank = true;
+                            cell.image = null;
+                        } else {
+                            cell.isBlank = false;
+                            cell.image = images[Math.floor(Math.random() * images.length)];
+                        }
+                        cell.timer = settings.minChange + Math.random() * (settings.maxChange - settings.minChange);
+                    }
+                }
+            }
+        }
+        
+        // Draw grid
+        function drawGrid() {
+            // Fill background
+            ctx.fillStyle = canvasColor;
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            
+            for (let idx = 0; idx < totalCells; idx++) {
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
+                const x = cachedOffsetX + col * cachedCellSize;
+                const y = cachedOffsetY + row * cachedCellSize;
+                
+                let imgToDraw = null;
+                
+                if (mode === 2 && idx < mode2Cells.length) {
+                    const cell = mode2Cells[idx];
+                    if (cell.isBlank) {
+                        imgToDraw = mode2Background;
+                    } else {
+                        imgToDraw = cell.image;
+                    }
+                } else {
+                    imgToDraw = imageGrid[idx];
+                }
+                
+                if (imgToDraw) {
+                    ctx.drawImage(imgToDraw, x, y, cachedCellSize, cachedCellSize);
+                }
+            }
+        }
+        
+        // Update UI
+        function updateUI() {
+            document.getElementById('modeText').textContent = mode === 1 ? 'Uniform' : `Random (${RANDOM_MODES[currentRandomMode].name})`;
+            document.getElementById('cellCount').textContent = totalCells;
+            document.getElementById('bpmText').textContent = bpm;
+            document.getElementById('bgText').textContent = canvasColor === '#FFFFFF' ? 'White' : 'Black';
+            
+            if (!showInfo) {
+                document.getElementById('info').style.display = 'none';
+                document.getElementById('controls').classList.add('hidden');
+            } else {
+                document.getElementById('info').style.display = 'block';
+                document.getElementById('controls').classList.remove('hidden');
+            }
+        }
+        
+        // Animation loop
+        let lastFrameTime = Date.now();
+        function animate() {
+            const now = Date.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+            const deltaSeconds = delta / 1000;
+            
+            if (!paused) {
+                // Beat detection
+                if (now - lastBeatTime >= beatInterval) {
+                    lastBeatTime = now;
+                    
+                    if (mode === 1) {
+                        mode1BeatCounter++;
+                        if (mode1BeatCounter >= MODE1_BEAT_INTERVAL) {
+                            mode1BeatCounter = 0;
+                            const newImage = images[Math.floor(Math.random() * images.length)];
+                            for (let i = 0; i < totalCells; i++) {
+                                imageGrid[i] = newImage;
+                            }
+                        }
+                    }
+                }
+                
+                // Update Mode 2
+                if (mode === 2) {
+                    updateMode2(deltaSeconds);
+                }
+            }
+            
+            drawGrid();
+            updateUI();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Set grid size
+        function setGridSize(newSize) {
+            newSize = Math.max(1, Math.min(1000, newSize));
+            if (newSize === totalCells) return;
+            
+            totalCells = newSize;
+            
+            if (mode === 1) {
+                const currentImage = imageGrid[0] || images[0];
+                imageGrid = [];
+                for (let i = 0; i < totalCells; i++) {
+                    imageGrid.push(currentImage);
+                }
+            } else if (mode === 2) {
+                initializeMode2();
+            }
+            
+            updateLayout();
+        }
+        
+        // Toggle mode
+        function toggleMode() {
+            if (mode === 1) {
+                mode = 2;
+                initializeMode2();
+            } else {
+                mode = 1;
+                const newImage = images[Math.floor(Math.random() * images.length)];
+                imageGrid = [];
+                for (let i = 0; i < totalCells; i++) {
+                    imageGrid.push(newImage);
+                }
+                mode1BeatCounter = 0;
+            }
+        }
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'm':
+                    toggleMode();
+                    break;
+                case 'b':
+                    canvasColor = canvasColor === '#FFFFFF' ? '#000000' : '#FFFFFF';
+                    break;
+                case 'p':
+                    paused = !paused;
+                    break;
+                case 'i':
+                    showInfo = !showInfo;
+                    break;
+                case 'arrowup':
+                    bpm = Math.min(300, bpm + 5);
+                    beatInterval = 60000 / bpm;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case 'arrowdown':
+                    bpm = Math.max(30, bpm - 5);
+                    beatInterval = 60000 / bpm;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '+':
+                case '=':
+                    setGridSize(totalCells + 1);
+                    break;
+                case '-':
+                case '_':
+                    setGridSize(totalCells - 1);
+                    break;
+                case '1':
+                    currentRandomMode = 0;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '2':
+                    currentRandomMode = 1;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '3':
+                    currentRandomMode = 2;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '4':
+                    currentRandomMode = 3;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '5':
+                    currentRandomMode = 4;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '6':
+                    currentRandomMode = 5;
+                    if (mode === 2) initializeMode2();
+                    break;
+                case '7':
+                    currentRandomMode = 6;
+                    if (mode === 2) initializeMode2();
+                    break;
+            }
+        });
+        
+        // Mouse wheel control
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const direction = e.deltaY > 0 ? -1 : 1;
+            setGridSize(totalCells + direction);
+        });
+        
+        // Start button
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('startButton').classList.add('hidden');
+            generateImages(230); // Match the number of images from Pi version
+            initializeGrid();
+            animate();
+        });
+    </script>
+</body>
+</html>

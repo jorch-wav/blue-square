@@ -16,18 +16,18 @@
             background: #000;
             color: #fff;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
             height: 100vh;
         }
         
         #container {
-            position: relative;
-            width: 100vmin;
-            height: 100vmin;
-            max-width: 1200px;
-            max-height: 1200px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
         }
         
         #canvas {
@@ -125,7 +125,7 @@
     <button id="startButton">Click to Start</button>
     
     <div id="container">
-        <canvas id="canvas" width="1200" height="1200"></canvas>
+        <canvas id="canvas"></canvas>
     </div>
     
     <div id="controls">
@@ -161,9 +161,16 @@
 
     <script>
         // Configuration
-        const CANVAS_SIZE = 1200;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { alpha: false });
+        
+        // Set canvas to match window size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
         
         // State
         let images = [];
@@ -177,7 +184,7 @@
         let lastBeatTime = Date.now();
         let beatInterval = 60000 / bpm;
         let mode1BeatCounter = 0;
-        let zoomLevel = 1.0; // Zoom state
+        let zoomLevel = 1.0; // Zoom state (0.1 = small grid, 1.0 = full screen height)
         const MODE1_BEAT_INTERVAL = 8;
         
         // Mode 2 state
@@ -231,13 +238,20 @@
         function updateLayout() {
             cols = Math.max(1, Math.ceil(Math.sqrt(totalCells)));
             rows = Math.ceil(totalCells / cols);
-            const baseCellSize = Math.min(Math.floor(CANVAS_SIZE / cols), Math.floor(CANVAS_SIZE / rows));
-            cachedCellSize = Math.floor(baseCellSize * zoomLevel);
+            
+            // Zoom determines how much of the screen height the grid takes
+            const targetHeight = canvas.height * zoomLevel;
+            const targetWidth = canvas.width * zoomLevel;
+            
+            // Calculate cell size to fit the zoom level
+            const cellSizeByHeight = Math.floor(targetHeight / rows);
+            const cellSizeByWidth = Math.floor(targetWidth / cols);
+            cachedCellSize = Math.min(cellSizeByHeight, cellSizeByWidth);
             
             const gridWidth = cols * cachedCellSize;
             const gridHeight = rows * cachedCellSize;
-            cachedOffsetX = (CANVAS_SIZE - gridWidth) / 2;
-            cachedOffsetY = (CANVAS_SIZE - gridHeight) / 2;
+            cachedOffsetX = (canvas.width - gridWidth) / 2;
+            cachedOffsetY = (canvas.height - gridHeight) / 2;
         }
         
         // Initialize grid
@@ -335,7 +349,7 @@
         function drawGrid() {
             // Fill background
             ctx.fillStyle = canvasColor;
-            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             for (let idx = 0; idx < totalCells; idx++) {
                 const row = Math.floor(idx / cols);
@@ -358,6 +372,10 @@
                 
                 if (imgToDraw) {
                     ctx.drawImage(imgToDraw, x, y, cachedCellSize, cachedCellSize);
+                } else {
+                    // Empty cells match canvas background
+                    ctx.fillStyle = canvasColor;
+                    ctx.fillRect(x, y, cachedCellSize, cachedCellSize);
                 }
             }
         }
@@ -534,11 +552,11 @@
             }
         });
         
-        // Mouse wheel control - Zoom in/out
+        // Mouse wheel control - Adjust grid size on canvas
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
-            zoomLevel = Math.max(0.5, Math.min(3.0, zoomLevel + zoomDelta));
+            const zoomDelta = e.deltaY > 0 ? -0.05 : 0.05;
+            zoomLevel = Math.max(0.1, Math.min(1.0, zoomLevel + zoomDelta));
             updateLayout();
         });
         

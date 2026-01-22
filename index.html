@@ -132,14 +132,13 @@
         <h3>Controls</h3>
         <div class="control-group">
             <span class="key">M</span> Toggle Mode<br>
-            <span class="key">B</span> Toggle Background<br>
+            <span class="key">D</span> Toggle Background<br>
             <span class="key">P</span> Pause<br>
             <span class="key">I</span> Hide Info
         </div>
         <div class="control-group">
-            <span class="key">↑</span><span class="key">↓</span> BPM<br>
-            <span class="key">+</span><span class="key">-</span> Grid Size<br>
-            <span class="key">Scroll</span> Grid Size
+            <span class="key">←</span><span class="key">→</span> Add/Remove Cells<br>
+            <span class="key">Scroll</span> Zoom In/Out
         </div>
         <div class="control-group">
             <strong>Mode 2 Presets:</strong><br>
@@ -178,6 +177,7 @@
         let lastBeatTime = Date.now();
         let beatInterval = 60000 / bpm;
         let mode1BeatCounter = 0;
+        let zoomLevel = 1.0; // Zoom state
         const MODE1_BEAT_INTERVAL = 8;
         
         // Mode 2 state
@@ -231,7 +231,8 @@
         function updateLayout() {
             cols = Math.max(1, Math.ceil(Math.sqrt(totalCells)));
             rows = Math.ceil(totalCells / cols);
-            cachedCellSize = Math.min(Math.floor(CANVAS_SIZE / cols), Math.floor(CANVAS_SIZE / rows));
+            const baseCellSize = Math.min(Math.floor(CANVAS_SIZE / cols), Math.floor(CANVAS_SIZE / rows));
+            cachedCellSize = Math.floor(baseCellSize * zoomLevel);
             
             const gridWidth = cols * cachedCellSize;
             const gridHeight = rows * cachedCellSize;
@@ -451,12 +452,15 @@
         }
         
         // Keyboard controls
+        // Keyboard controls
+        let arrowHeldInterval = null;
+        
         document.addEventListener('keydown', (e) => {
             switch(e.key.toLowerCase()) {
                 case 'm':
                     toggleMode();
                     break;
-                case 'b':
+                case 'd':
                     canvasColor = canvasColor === '#FFFFFF' ? '#000000' : '#FFFFFF';
                     break;
                 case 'p':
@@ -465,23 +469,29 @@
                 case 'i':
                     showInfo = !showInfo;
                     break;
-                case 'arrowup':
-                    bpm = Math.min(300, bpm + 5);
-                    beatInterval = 60000 / bpm;
-                    if (mode === 2) initializeMode2();
+                case 'arrowleft':
+                    e.preventDefault();
+                    if (!arrowHeldInterval) {
+                        setGridSize(totalCells - 1);
+                        // Long-press: rapid removal after 300ms
+                        arrowHeldInterval = setTimeout(() => {
+                            arrowHeldInterval = setInterval(() => {
+                                setGridSize(totalCells - 1);
+                            }, 100);
+                        }, 300);
+                    }
                     break;
-                case 'arrowdown':
-                    bpm = Math.max(30, bpm - 5);
-                    beatInterval = 60000 / bpm;
-                    if (mode === 2) initializeMode2();
-                    break;
-                case '+':
-                case '=':
-                    setGridSize(totalCells + 1);
-                    break;
-                case '-':
-                case '_':
-                    setGridSize(totalCells - 1);
+                case 'arrowright':
+                    e.preventDefault();
+                    if (!arrowHeldInterval) {
+                        setGridSize(totalCells + 1);
+                        // Long-press: rapid addition after 300ms
+                        arrowHeldInterval = setTimeout(() => {
+                            arrowHeldInterval = setInterval(() => {
+                                setGridSize(totalCells + 1);
+                            }, 100);
+                        }, 300);
+                    }
                     break;
                 case '1':
                     currentRandomMode = 0;
@@ -514,11 +524,22 @@
             }
         });
         
-        // Mouse wheel control
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                if (arrowHeldInterval) {
+                    clearTimeout(arrowHeldInterval);
+                    clearInterval(arrowHeldInterval);
+                    arrowHeldInterval = null;
+                }
+            }
+        });
+        
+        // Mouse wheel control - Zoom in/out
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const direction = e.deltaY > 0 ? -1 : 1;
-            setGridSize(totalCells + direction);
+            const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomLevel = Math.max(0.5, Math.min(3.0, zoomLevel + zoomDelta));
+            updateLayout();
         });
         
         // Start button

@@ -205,43 +205,26 @@
         let rows = 1;
         let cols = 1;
         
-        // Generate placeholder images (blue themed)
-        function generateImages(count = 50) {
-            const hues = [200, 210, 220, 230, 240]; // Blue hues
-            for (let i = 0; i < count; i++) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = 100;
-                tempCanvas.height = 100;
-                const tempCtx = tempCanvas.getContext('2d');
+        // Load actual blue images
+        async function loadImages() {
+            const imagePromises = [];
+            
+            // Load all 230 blue images (skipping blue-57.jpg which doesn't exist)
+            for (let i = 1; i <= 231; i++) {
+                if (i === 57) continue; // Skip missing image
                 
-                // Create gradient or pattern
-                if (Math.random() > 0.5) {
-                    // Gradient
-                    const gradient = tempCtx.createLinearGradient(0, 0, 100, 100);
-                    const hue = hues[Math.floor(Math.random() * hues.length)];
-                    const sat = 60 + Math.random() * 40;
-                    const light = 40 + Math.random() * 30;
-                    gradient.addColorStop(0, `hsl(${hue}, ${sat}%, ${light}%)`);
-                    gradient.addColorStop(1, `hsl(${hue + 20}, ${sat + 10}%, ${light + 20}%)`);
-                    tempCtx.fillStyle = gradient;
-                    tempCtx.fillRect(0, 0, 100, 100);
-                } else {
-                    // Random shapes
-                    const hue = hues[Math.floor(Math.random() * hues.length)];
-                    tempCtx.fillStyle = `hsl(${hue}, 70%, 50%)`;
-                    tempCtx.fillRect(0, 0, 100, 100);
-                    
-                    // Add circles
-                    for (let j = 0; j < 3; j++) {
-                        tempCtx.fillStyle = `hsl(${hue + 30}, 60%, ${40 + Math.random() * 20}%)`;
-                        tempCtx.beginPath();
-                        tempCtx.arc(Math.random() * 100, Math.random() * 100, 10 + Math.random() * 30, 0, Math.PI * 2);
-                        tempCtx.fill();
-                    }
-                }
-                
-                images.push(tempCanvas);
+                const img = new Image();
+                const promise = new Promise((resolve, reject) => {
+                    img.onload = () => resolve(img);
+                    img.onerror = () => resolve(null); // Don't fail on missing images
+                });
+                img.src = `images/blue-${i}.jpg`;
+                imagePromises.push(promise);
             }
+            
+            const loadedImgs = await Promise.all(imagePromises);
+            images = loadedImgs.filter(img => img !== null);
+            console.log(`Loaded ${images.length} images`);
         }
         
         // Update layout
@@ -539,9 +522,13 @@
         });
         
         // Start button
-        document.getElementById('startButton').addEventListener('click', () => {
-            document.getElementById('startButton').classList.add('hidden');
-            generateImages(230); // Match the number of images from Pi version
+        document.getElementById('startButton').addEventListener('click', async () => {
+            const button = document.getElementById('startButton');
+            button.textContent = 'Loading Images...';
+            
+            await loadImages();
+            
+            button.classList.add('hidden');
             initializeGrid();
             animate();
         });

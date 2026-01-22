@@ -162,13 +162,18 @@
         // Configuration
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { alpha: false });
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
         
-        // Set canvas to match window size
+        // Set canvas to match window size with device pixel ratio for crisp rendering
         function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(dpr, dpr);
+            // Re-enable smoothing after resize (canvas resize resets context)
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
@@ -240,9 +245,13 @@
             cols = Math.max(1, Math.ceil(Math.sqrt(totalCells)));
             rows = Math.ceil(totalCells / cols);
             
+            // Use display size (not internal canvas resolution)
+            const displayWidth = window.innerWidth;
+            const displayHeight = window.innerHeight;
+            
             // Zoom determines how much of the screen height the grid takes
-            const targetHeight = canvas.height * zoomLevel;
-            const targetWidth = canvas.width * zoomLevel;
+            const targetHeight = displayHeight * zoomLevel;
+            const targetWidth = displayWidth * zoomLevel;
             
             // Calculate cell size to fit the zoom level
             const cellSizeByHeight = Math.floor(targetHeight / rows);
@@ -251,8 +260,8 @@
             
             const gridWidth = cols * cachedCellSize;
             const gridHeight = rows * cachedCellSize;
-            cachedOffsetX = (canvas.width - gridWidth) / 2;
-            cachedOffsetY = (canvas.height - gridHeight) / 2;
+            cachedOffsetX = (displayWidth - gridWidth) / 2;
+            cachedOffsetY = (displayHeight - gridHeight) / 2;
         }
         
         // Initialize grid
@@ -348,9 +357,9 @@
         
         // Draw grid
         function drawGrid() {
-            // Fill background
+            // Fill background using display size
             ctx.fillStyle = canvasColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
             
             for (let idx = 0; idx < totalCells; idx++) {
                 const row = Math.floor(idx / cols);

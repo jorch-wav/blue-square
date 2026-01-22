@@ -42,9 +42,9 @@
         <div>Beat: <span id="beat">1/8</span></div>
     </div>
     <div id="controls" style="display: none;">
-        <div><span class="key">M</span> Mode | <span class="key">P</span> Pause | <span class="key">←→</span> Presets</div>
-        <div><span class="key">↑↓</span> Speed | <span class="key">+</span> Zoom In | <span class="key">-</span> Zoom Out</div>
-        <div><span class="key">1-7</span> Jump Preset | <span class="key">Wheel</span> Grid Size</div>
+        <div><span class="key">M</span> Mode | <span class="key">P</span> Pause | <span class="key">D</span> Background</div>
+        <div><span class="key">↑↓</span> Speed | <span class="key">←→</span> Add/Remove Cells | <span class="key">Wheel</span> Zoom</div>
+        <div><span class="key">1-7</span> Jump Preset (Mode 2 only)</div>
     </div>
 
     <script>
@@ -77,6 +77,14 @@
         
         let frameCount = 0;
         let beatCount = 0;
+        
+        // Background color
+        let backgroundColor = '#000';
+        
+        // Key press tracking for long press
+        let leftPressed = false;
+        let rightPressed = false;
+        let keyPressInterval = null;
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -164,6 +172,29 @@
             }
         }
         
+        function addCell() {
+            if (cellCount < 400) {
+                cellCount++;
+                grid.push({
+                    imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
+                    nextImageIndex: 0,
+                    visible: true,
+                    transitioning: false,
+                    transitionProgress: 0,
+                    updateOffset: Math.random() * 0.3
+                });
+                calculateLayout();
+            }
+        }
+        
+        function removeCell() {
+            if (cellCount > 1) {
+                cellCount--;
+                grid.pop();
+                calculateLayout();
+            }
+        }
+        
         function updateUniform() {
             frameCount++;
             if (frameCount >= FRAMES_PER_BEAT / animationSpeed) {
@@ -197,7 +228,7 @@
                 beatCount++;
                 
                 for (let cell of grid) {
-                    if (Math.random() < (preset.changeRate + cell.updateOffset * 0.1)) {
+                    if (MathbackgroundColorm() < (preset.changeRate + cell.updateOffset * 0.1)) {
                         cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
                         cell.transitioning = true;
                         cell.transitionProgress = 0;
@@ -311,16 +342,35 @@
                 case 'p':
                     paused = !paused;
                     break;
+                case 'd':
+                    backgroundColor = backgroundColor === '#000' ? '#fff' : '#000';
+                    break;
                 case 'arrowleft':
-                    if (mode === 2) {
-                        currentPreset = (currentPreset - 1 + presets.length) % presets.length;
-                        updateInfo();
+                    if (!leftPressed) {
+                        leftPressed = true;
+                        removeCell();
+                        // Start long press after 300ms
+                        setTimeout(() => {
+                            if (leftPressed && !keyPressInterval) {
+                                keyPressInterval = setInterval(() => {
+                                    if (leftPressed) removeCell();
+                                }, 50);
+                            }
+                        }, 300);
                     }
                     break;
                 case 'arrowright':
-                    if (mode === 2) {
-                        currentPreset = (currentPreset + 1) % presets.length;
-                        updateInfo();
+                    if (!rightPressed) {
+                        rightPressed = true;
+                        addCell();
+                        // Start long press after 300ms
+                        setTimeout(() => {
+                            if (rightPressed && !keyPressInterval) {
+                                keyPressInterval = setInterval(() => {
+                                    if (rightPressed) addCell();
+                                }, 50);
+                            }
+                        }, 300);
                     }
                     break;
                 case 'arrowup':
@@ -329,22 +379,19 @@
                 case 'arrowdown':
                     animationSpeed = Math.max(0.1, animationSpeed - 0.2);
                     break;
-                case '+':
-                case '=':
-                    scale = Math.min(2.0, scale + 0.1);
-                    calculateLayout();
-                    break;
-                case '-':
-                case '_':
-                    scale = Math.max(0.3, scale - 0.1);
-                    calculateLayout();
-                    break;
                 case '1': case '2': case '3': case '4': case '5': case '6': case '7':
                     if (mode === 2) {
-                        currentPreset = parseInt(e.key) - 1;
-                        updateInfo();
-                    }
-                    break;
+            // Zoom in/out
+            if (e.deltaY < 0) {
+                scale = Math.min(2.0, scale + 0.05);
+            } else {
+                scale = Math.max(0.3, scale - 0.05);
+            }t') {
+                rightPressed = false;
+                if (keyPressInterval) {
+                    clearInterval(keyPressInterval);
+                    keyPressInterval = null;
+                }
             }
         });
         
@@ -376,3 +423,7 @@
     </script>
 </body>
 </html>
+// Start with 1 cell
+        cellCount = 1;
+        
+        

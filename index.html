@@ -452,6 +452,7 @@
             newSize = Math.max(1, Math.min(1000, newSize));
             if (newSize === totalCells) return;
             
+            const oldSize = totalCells;
             totalCells = newSize;
             // Clear reset flag when manually changing grid size
             if (totalCells !== 1) {
@@ -460,12 +461,33 @@
             
             if (mode === 1) {
                 const currentImage = imageGrid[0] || images[0];
-                imageGrid = [];
-                for (let i = 0; i < totalCells; i++) {
-                    imageGrid.push(currentImage);
+                // Preserve existing cells, only add or remove
+                if (totalCells > oldSize) {
+                    // Adding cells - add new cells with current uniform image
+                    for (let i = oldSize; i < totalCells; i++) {
+                        imageGrid.push(currentImage);
+                    }
+                } else {
+                    // Removing cells - just trim the array
+                    imageGrid = imageGrid.slice(0, totalCells);
                 }
             } else if (mode === 2) {
-                initializeMode2();
+                // Preserve existing mode2 cells, add or remove
+                const settings = RANDOM_MODES[currentRandomMode];
+                if (totalCells > oldSize) {
+                    // Adding cells - create new cells
+                    for (let i = oldSize; i < totalCells; i++) {
+                        mode2Cells.push({
+                            image: images[Math.floor(Math.random() * images.length)],
+                            isBlank: false,
+                            timer: settings.minChange + Math.random() * (settings.maxChange - settings.minChange),
+                            inWave: false
+                        });
+                    }
+                } else {
+                    // Removing cells - just trim the array
+                    mode2Cells = mode2Cells.slice(0, totalCells);
+                }
             }
             
             updateLayout();

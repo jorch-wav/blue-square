@@ -574,13 +574,11 @@
                     e.preventDefault();
                     bpm = Math.min(300, bpm + 5);
                     beatInterval = 60000 / bpm;
-                    if (mode === 2) initializeMode2();
                     break;
                 case 'arrowdown':
                     e.preventDefault();
                     bpm = Math.max(30, bpm - 5);
                     beatInterval = 60000 / bpm;
-                    if (mode === 2) initializeMode2();
                     break;
                     break;
                 case 'arrowleft':

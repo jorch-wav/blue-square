@@ -49,10 +49,10 @@
 
     <script>
         const TOTAL_IMAGES = 230;
-        const BATCH_SIZE = 30; // Load 30 at a time
+        const BATCH_SIZE = 30;
         const DEFAULT_CELLS = 64;
         const FPS = 60;
-        const FRAMES_PER_BEAT = 30; // 30 frames = 0.5 sec at 60fps = 120 BPM
+        const FRAMES_PER_BEAT = 30;
         
         let mode = 1;
         let currentPreset = 0;
@@ -65,6 +65,15 @@
         let loadedImages = new Set();
         let grid = [];
         let cols = 0, rows = 0, cellSize = 0;
+        
+        // Mode 1: All cells show same uniform image
+        let uniformImage = 0;
+        let nextUniformImage = 0;
+        let uniformTransitioning = false;
+        let uniformTransitionProgress = 0;
+        
+        // Mode 2: Each cell independent with background
+        let backgroundImage = null;
         
         let frameCount = 0;
         let beatCount = 0;
@@ -97,16 +106,12 @@
             updateInfo();
         }
         
-        // Load images progressively in batches
         async function loadImages() {
             let loaded = 0;
-            
-            // Pre-create image objects
             for (let i = 1; i <= TOTAL_IMAGES; i++) {
                 images[i - 1] = null;
             }
             
-            // Load in batches
             for (let batch = 0; batch < Math.ceil(TOTAL_IMAGES / BATCH_SIZE); batch++) {
                 const start = batch * BATCH_SIZE + 1;
                 const end = Math.min((batch + 1) * BATCH_SIZE, TOTAL_IMAGES);
@@ -120,21 +125,16 @@
                             images[idx] = img;
                             loadedImages.add(idx);
                             loaded++;
-                            const percent = Math.floor((loaded / TOTAL_IMAGES) * 100);
-                            document.getElementById('loadProgress').textContent = percent + '%';
+                            document.getElementById('loadProgress').textContent = Math.floor((loaded / TOTAL_IMAGES) * 100) + '%';
                             resolve();
                         };
-                        img.onerror = () => {
-                            loaded++;
-                            resolve();
-                        };
+                        img.onerror = () => { loaded++; resolve(); };
                         img.src = `images/blue-${i}.jpg`;
                     }));
                 }
                 
                 await Promise.all(promises);
                 
-                // Start animation after first batch
                 if (batch === 0 && !grid.length) {
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('info').style.display = 'block';
@@ -143,76 +143,61 @@
                     animate();
                 }
             }
-            
-            console.log(`Loaded ${loadedImages.size} images`);
         }
         
         function initializeGrid() {
+            uniformImage = Math.floor(Math.random() * TOTAL_IMAGES);
+            uniformTransitioning = false;
+            
+            backgroundImage = Math.random() < 0.4 ? null : Math.floor(Math.random() * TOTAL_IMAGES);
+            
             grid = [];
             for (let i = 0; i < cellCount; i++) {
                 grid.push({
                     imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    nextImageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    visible: true,
-                    alpha: 1.0,
+                    nextImageIndex: 0,
+                    visible: Math.random() < 0.7,
                     transitioning: false,
                     transitionProgress: 0,
-                    updateOffset: Math.random() * 0.3 // 0-30% offset for organic feel
+                    updateOffset: Math.random() * 0.3
                 });
             }
         }
         
         function updateUniform() {
             frameCount++;
-            
-            const framesPerBeat = FRAMES_PER_BEAT / animationSpeed;
-            
-            if (frameCount >= framesPerBeat) {
+            if (frameCount >= FRAMES_PER_BEAT / animationSpeed) {
                 frameCount = 0;
                 beatCount++;
                 
                 if (beatCount % 8 === 0) {
-                    // Start transition for all cells with slight offset
-                    for (let cell of grid) {
-                        cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
-                        cell.transitioning = true;
-                        cell.transitionProgress = 0;
-                    }
+                    nextUniformImage = Math.floor(Math.random() * TOTAL_IMAGES);
+                    uniformTransitioning = true;
+                    uniformTransitionProgress = 0;
                 }
                 updateInfo();
             }
             
-            // Update transitions smoothly
-            for (let cell of grid) {
-                if (cell.transitioning) {
-                    cell.transitionProgress += 0.15; // Smooth fade speed
-                    
-                    if (cell.transitionProgress >= 1.0) {
-                        cell.imageIndex = cell.nextImageIndex;
-                        cell.transitioning = false;
-                        cell.transitionProgress = 0;
-                        cell.alpha = 1.0;
-                    }
+            if (uniformTransitioning) {
+                uniformTransitionProgress += 0.15;
+                if (uniformTransitionProgress >= 1.0) {
+                    uniformImage = nextUniformImage;
+                    uniformTransitioning = false;
+                    uniformTransitionProgress = 0;
                 }
             }
         }
         
         function updateRandom() {
             frameCount++;
-            
             const preset = presets[currentPreset];
-            const framesPerBeat = FRAMES_PER_BEAT / (animationSpeed * preset.speed);
             
-            if (frameCount >= framesPerBeat) {
+            if (frameCount >= FRAMES_PER_BEAT / (animationSpeed * preset.speed)) {
                 frameCount = 0;
                 beatCount++;
                 
-                for (let i = 0; i < grid.length; i++) {
-                    const cell = grid[i];
-                    // Use cell's offset for organic timing
-                    const shouldUpdate = Math.random() < (preset.changeRate + cell.updateOffset * 0.1);
-                    
-                    if (shouldUpdate) {
+                for (let cell of grid) {
+                    if (Math.random() < (preset.changeRate + cell.updateOffset * 0.1)) {
                         cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
                         cell.transitioning = true;
                         cell.transitionProgress = 0;
@@ -222,37 +207,13 @@
                 updateInfo();
             }
             
-            // Update transitions
             for (let cell of grid) {
                 if (cell.transitioning) {
                     cell.transitionProgress += 0.12;
-                    
                     if (cell.transitionProgress >= 1.0) {
                         cell.imageIndex = cell.nextImageIndex;
                         cell.transitioning = false;
-                if (cell.transitioning) {
-                    // Cross-fade between old and new image
-                    const oldImg = images[cell.imageIndex];
-                    const newImg = images[cell.nextImageIndex];
-                    
-                    // Draw old image fading out
-                    if (oldImg) {
-                        ctx.globalAlpha = 1.0 - cell.transitionProgress;
-                        ctx.drawImage(oldImg, x, y, cellSize, cellSize);
-                    }
-                    
-                    // Draw new image fading in
-                    if (newImg) {
-                        ctx.globalAlpha = cell.transitionProgress;
-                        ctx.drawImage(newImg, x, y, cellSize, cellSize);
-                    }
-                    
-                    ctx.globalAlpha = 1.0;
-                } else {
-                    // Draw current image normally
-                    const img = images[cell.imageIndex];
-                    if (img) {
-                        ctx.drawImage(img, x, y, cellSize, cellSize);
+                        cell.transitionProgress = 0;
                     }
                 }
             }
@@ -265,18 +226,60 @@
             const offsetX = (canvas.width - (cellSize * cols)) / 2;
             const offsetY = (canvas.height - (cellSize * rows)) / 2;
             
-            for (let i = 0; i < grid.length && i < cellCount; i++) {
-                const cell = grid[i];
-                if (!cell.visible) continue;
+            if (mode === 1) {
+                // MODE 1: All cells show the SAME uniform image
+                const oldImg = images[uniformImage];
+                const newImg = images[nextUniformImage];
                 
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                const x = offsetX + (col * cellSize);
-                const y = offsetY + (row * cellSize);
-                
-                const img = images[cell.imageIndex];
-                if (img) {
-                    ctx.drawImage(img, x, y, cellSize, cellSize);
+                for (let i = 0; i < cellCount; i++) {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    const x = offsetX + (col * cellSize);
+                    const y = offsetY + (row * cellSize);
+                    
+                    if (uniformTransitioning && oldImg && newImg) {
+                        ctx.globalAlpha = 1.0 - uniformTransitionProgress;
+                        ctx.drawImage(oldImg, x, y, cellSize, cellSize);
+                        ctx.globalAlpha = uniformTransitionProgress;
+                        ctx.drawImage(newImg, x, y, cellSize, cellSize);
+                        ctx.globalAlpha = 1.0;
+                    } else if (oldImg) {
+                        ctx.drawImage(oldImg, x, y, cellSize, cellSize);
+                    }
+                }
+            } else {
+                // MODE 2: Each cell independent with background
+                for (let i = 0; i < grid.length && i < cellCount; i++) {
+                    const cell = grid[i];
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    const x = offsetX + (col * cellSize);
+                    const y = offsetY + (row * cellSize);
+                    
+                    if (!cell.visible) {
+                        if (backgroundImage !== null) {
+                            const bgImg = images[backgroundImage];
+                            if (bgImg) ctx.drawImage(bgImg, x, y, cellSize, cellSize);
+                        }
+                        continue;
+                    }
+                    
+                    if (cell.transitioning) {
+                        const oldImg = images[cell.imageIndex];
+                        const newImg = images[cell.nextImageIndex];
+                        if (oldImg) {
+                            ctx.globalAlpha = 1.0 - cell.transitionProgress;
+                            ctx.drawImage(oldImg, x, y, cellSize, cellSize);
+                        }
+                        if (newImg) {
+                            ctx.globalAlpha = cell.transitionProgress;
+                            ctx.drawImage(newImg, x, y, cellSize, cellSize);
+                        }
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        const img = images[cell.imageIndex];
+                        if (img) ctx.drawImage(img, x, y, cellSize, cellSize);
+                    }
                 }
             }
         }
@@ -301,6 +304,7 @@
             switch(e.key.toLowerCase()) {
                 case 'm':
                     mode = mode === 1 ? 2 : 1;
+                    frameCount = 0;
                     beatCount = 0;
                     updateInfo();
                     break;
@@ -333,12 +337,7 @@
                 case '-':
                 case '_':
                     scale = Math.max(0.3, scale - 0.1);
-                    nextImageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    visible: true,
-                    alpha: 1.0,
-                    transitioning: false,
-                    transitionProgress: 0,
-                    updateOffset: Math.random() * 0.3ut();
+                    calculateLayout();
                     break;
                 case '1': case '2': case '3': case '4': case '5': case '6': case '7':
                     if (mode === 2) {
@@ -359,7 +358,11 @@
             while (grid.length < cellCount) {
                 grid.push({
                     imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
-                    visible: true
+                    nextImageIndex: 0,
+                    visible: true,
+                    transitioning: false,
+                    transitionProgress: 0,
+                    updateOffset: Math.random() * 0.3
                 });
             }
             grid.length = cellCount;

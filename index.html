@@ -212,7 +212,7 @@
                 beatCount++;
                 
                 for (let cell of grid) {
-                    if (MathbackgroundColorm() < (preset.changeRate + cell.updateOffset * 0.1)) {
+                    if (Math.random() < (preset.changeRate + cell.updateOffset * 0.1)) {
                         cell.nextImageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
                         cell.transitioning = true;
                         cell.transitionProgress = 0;

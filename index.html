@@ -138,6 +138,7 @@
         </div>
         <div class="control-group">
             <span class="key">←</span><span class="key">→</span> Add/Remove Cells<br>
+            <span class="key">Shift</span><span class="key">←</span><span class="key">→</span> Add/Remove 5 Cells<br>
             <span class="key">Scroll</span> Zoom In/Out
         </div>
         <div class="control-group">
@@ -490,11 +491,13 @@
                 case 'arrowleft':
                     e.preventDefault();
                     if (!arrowHeldInterval) {
-                        setGridSize(totalCells - 1);
+                        const step = e.shiftKey ? 5 : 1;
+                        setGridSize(totalCells - step);
                         // Long-press: rapid removal after 300ms
                         arrowHeldInterval = setTimeout(() => {
                             arrowHeldInterval = setInterval(() => {
-                                setGridSize(totalCells - 1);
+                                const rapidStep = e.shiftKey ? 5 : 1;
+                                setGridSize(totalCells - rapidStep);
                             }, 100);
                         }, 300);
                     }
@@ -502,11 +505,13 @@
                 case 'arrowright':
                     e.preventDefault();
                     if (!arrowHeldInterval) {
-                        setGridSize(totalCells + 1);
+                        const step = e.shiftKey ? 5 : 1;
+                        setGridSize(totalCells + step);
                         // Long-press: rapid addition after 300ms
                         arrowHeldInterval = setTimeout(() => {
                             arrowHeldInterval = setInterval(() => {
-                                setGridSize(totalCells + 1);
+                                const rapidStep = e.shiftKey ? 5 : 1;
+                                setGridSize(totalCells + rapidStep);
                             }, 100);
                         }, 300);
                     }

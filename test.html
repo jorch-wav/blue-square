@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test</title>
+</head>
+<body>
+    <div id="loading">LOADING...</div>
+    <div id="info" style="display:none;">APP STARTED!</div>
+    <script>
+        console.log('Script started');
+        
+        async function loadImages() {
+            console.log('loadImages called');
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('info').style.display = 'block';
+            console.log('Should be visible now');
+        }
+        
+        console.log('About to call loadImages');
+        loadImages();
+        console.log('Called loadImages');
+    </script>
+</body>
+</html>

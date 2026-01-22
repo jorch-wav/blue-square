@@ -137,7 +137,7 @@
         </div>
         <div class="control-group">
             <span class="key">←</span><span class="key">→</span> Add/Remove Cells<br>
-            <span class="key">Shift</span><span class="key">←</span><span class="key">→</span> Add/Remove 5 Cells<br>
+            <span class="key">Shift</span><span class="key">←</span><span class="key">→</span> Square Grid (1x1, 2x2, 3x3...)<br>
             <span class="key">Scroll</span> Zoom In/Out
         </div>
         <div class="control-group">
@@ -191,7 +191,7 @@
         let lastBeatTime = Date.now();
         let beatInterval = 60000 / bpm;
         let mode1BeatCounter = 0;
-        let zoomLevel = 1.0; // Zoom state (0.1 = small grid, 1.0 = full screen height)
+        let zoomLevel = 0.5; // Zoom state (0.1 = small grid, 1.0 = full screen height) - start at 50%
         let previousCellCount = 1; // Store cell count before reset
         let isReset = false; // Track if currently in reset state
         const MODE1_BEAT_INTERVAL = 8;
@@ -486,6 +486,19 @@
             }
         }
         
+        // Helper functions for square grid (n×n) operations
+        function getSquareSize(cellCount) {
+            // Get the square root, find closest perfect square
+            return Math.ceil(Math.sqrt(cellCount));
+        }
+        
+        function getNextSquareGrid(currentCells, direction) {
+            // direction: 1 for increase, -1 for decrease
+            const currentSquare = getSquareSize(currentCells);
+            const nextSquare = Math.max(1, currentSquare + direction);
+            return nextSquare * nextSquare;
+        }
+        
         // Keyboard controls
         // Keyboard controls
         let arrowHeldInterval = null;
@@ -519,13 +532,23 @@
                 case 'arrowleft':
                     e.preventDefault();
                     if (!arrowHeldInterval) {
-                        const step = e.shiftKey ? 5 : 1;
-                        setGridSize(totalCells - step);
+                        if (e.shiftKey) {
+                            // Shift: decrease to previous square grid (3x3 -> 2x2)
+                            const newSize = getNextSquareGrid(totalCells, -1);
+                            setGridSize(newSize);
+                        } else {
+                            // Normal: decrease by 1
+                            setGridSize(totalCells - 1);
+                        }
                         // Long-press: rapid removal after 300ms
                         arrowHeldInterval = setTimeout(() => {
                             arrowHeldInterval = setInterval(() => {
-                                const rapidStep = e.shiftKey ? 5 : 1;
-                                setGridSize(totalCells - rapidStep);
+                                if (e.shiftKey) {
+                                    const newSize = getNextSquareGrid(totalCells, -1);
+                                    setGridSize(newSize);
+                                } else {
+                                    setGridSize(totalCells - 1);
+                                }
                             }, 100);
                         }, 300);
                     }
@@ -533,13 +556,23 @@
                 case 'arrowright':
                     e.preventDefault();
                     if (!arrowHeldInterval) {
-                        const step = e.shiftKey ? 5 : 1;
-                        setGridSize(totalCells + step);
+                        if (e.shiftKey) {
+                            // Shift: increase to next square grid (2x2 -> 3x3)
+                            const newSize = getNextSquareGrid(totalCells, 1);
+                            setGridSize(newSize);
+                        } else {
+                            // Normal: increase by 1
+                            setGridSize(totalCells + 1);
+                        }
                         // Long-press: rapid addition after 300ms
                         arrowHeldInterval = setTimeout(() => {
                             arrowHeldInterval = setInterval(() => {
-                                const rapidStep = e.shiftKey ? 5 : 1;
-                                setGridSize(totalCells + rapidStep);
+                                if (e.shiftKey) {
+                                    const newSize = getNextSquareGrid(totalCells, 1);
+                                    setGridSize(newSize);
+                                } else {
+                                    setGridSize(totalCells + 1);
+                                }
                             }, 100);
                         }, 300);
                     }

@@ -115,12 +115,35 @@
         }
         
         async function loadImages() {
-            let loaded = 0;
-            for (let i = 1; i <= TOTAL_IMAGES; i++) {
-                images[i - 1] = null;
+            // Load first 10 images immediately to start faster
+            const initialPromises = [];
+            for (let i = 1; i <= 10; i++) {
+                const idx = i - 1;
+                initialPromises.push(new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        images[idx] = img;
+                        loadedImages.add(idx);
+                        document.getElementById('loadProgress').textContent = Math.floor(((i / TOTAL_IMAGES) * 100)) + '%';
+                        resolve();
+                    };
+                    img.onerror = () => resolve();
+                    img.src = `images/blue-${i}.jpg`;
+                }));
             }
             
-            for (let batch = 0; batch < Math.ceil(TOTAL_IMAGES / BATCH_SIZE); batch++) {
+            await Promise.all(initialPromises);
+            
+            // Start the app immediately
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('info').style.display = 'block';
+            document.getElementById('controls').style.display = 'block';
+            initializeGrid();
+            animate();
+            
+            // Continue loading rest in background
+            let loaded = 10;
+            for (let batch = 1; batch < Math.ceil(TOTAL_IMAGES / BATCH_SIZE); batch++) {
                 const start = batch * BATCH_SIZE + 1;
                 const end = Math.min((batch + 1) * BATCH_SIZE, TOTAL_IMAGES);
                 
@@ -133,7 +156,6 @@
                             images[idx] = img;
                             loadedImages.add(idx);
                             loaded++;
-                            document.getElementById('loadProgress').textContent = Math.floor((loaded / TOTAL_IMAGES) * 100) + '%';
                             resolve();
                         };
                         img.onerror = () => { loaded++; resolve(); };
@@ -142,14 +164,6 @@
                 }
                 
                 await Promise.all(promises);
-                
-                if (batch === 0 && !grid.length) {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('info').style.display = 'block';
-                    document.getElementById('controls').style.display = 'block';
-                    initializeGrid();
-                    animate();
-                }
             }
         }
         

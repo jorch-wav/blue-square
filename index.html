@@ -5,189 +5,147 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blue Square</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Courier New', monospace;
-            background: #000;
-            overflow: hidden;
-        }
-
-        #canvas {
-            display: block;
-            image-rendering: crisp-edges;
-            image-rendering: pixelated;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', monospace; background: #000; overflow: hidden; }
+        #canvas { display: block; }
         #info {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            font-size: 14px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-            user-select: none;
-            z-index: 10;
-            line-height: 1.6;
+            position: absolute; top: 20px; left: 20px; color: white;
+            font-size: 14px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            user-select: none; z-index: 10; line-height: 1.6;
         }
-
         #controls {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: white;
-            font-size: 12px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-            user-select: none;
-            z-index: 10;
-            line-height: 1.8;
+            position: absolute; bottom: 20px; left: 20px; color: white;
+            font-size: 12px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            user-select: none; z-index: 10; line-height: 1.8;
         }
-
         .key {
-            display: inline-block;
-            padding: 2px 6px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            margin-right: 4px;
+            display: inline-block; padding: 2px 6px;
+            background: rgba(255,255,255,0.2); border-radius: 3px; margin-right: 4px;
         }
-
         #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 24px;
-            text-align: center;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-size: 24px; text-align: center;
         }
     </style>
 </head>
 <body>
     <canvas id="canvas"></canvas>
-    
     <div id="loading">
         <div>Loading Blue Square...</div>
-        <div id="loadProgress">0 / 230 images</div>
+        <div id="loadProgress">0%</div>
     </div>
-    
     <div id="info" style="display: none;">
         <div><strong>BLUE SQUARE</strong></div>
         <div>Mode: <span id="mode">Uniform</span></div>
         <div>Preset: <span id="preset">-</span></div>
         <div>Grid: <span id="cells">64</span> cells</div>
         <div>Beat: <span id="beat">1/8</span></div>
-        <div>BPM: <span id="bpm">120</span></div>
     </div>
-
     <div id="controls" style="display: none;">
-        <div><span class="key">M</span> Toggle Mode | <span class="key">B</span> Toggle Beat | <span class="key">P</span> Pause</div>
-        <div><span class="key">I</span> Toggle Images | <span class="key">←→</span> Presets | <span class="key">↑↓</span> Speed</div>
-        <div><span class="key">+ -</span> Scale | <span class="key">1-7</span> Jump to Preset | <span class="key">Wheel</span> Grid Size</div>
+        <div><span class="key">M</span> Mode | <span class="key">P</span> Pause | <span class="key">←→</span> Presets</div>
+        <div><span class="key">↑↓</span> Speed | <span class="key">+</span> Zoom In | <span class="key">-</span> Zoom Out</div>
+        <div><span class="key">1-7</span> Jump Preset | <span class="key">Wheel</span> Grid Size</div>
     </div>
 
     <script>
-        // Configuration
         const TOTAL_IMAGES = 230;
+        const BATCH_SIZE = 30; // Load 30 at a time
         const DEFAULT_CELLS = 64;
-        const DEFAULT_BPM = 120;
         
-        // State
-        let mode = 1; // 1 = Uniform, 2 = Random
+        let mode = 1;
         let currentPreset = 0;
         let cellCount = DEFAULT_CELLS;
-        let bpm = DEFAULT_BPM;
-        let beatDetection = true;
         let paused = false;
-        let showImages = true;
         let animationSpeed = 1.0;
         let scale = 1.0;
         
-        // Grid
         let images = [];
+        let loadedImages = new Set();
         let grid = [];
-        let cols = 0;
-        let rows = 0;
-        let cellSize = 0;
+        let cols = 0, rows = 0, cellSize = 0;
         
-        // Animation
-        let beatInterval = (60 / bpm) * 1000;
+        let beatInterval = 500;
         let beatCount = 0;
         let lastBeatTime = Date.now();
         
-        // Canvas
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Random Mode Presets
         const presets = [
-            { name: 'Calm', speed: 0.3, blankChance: 0.15 },
-            { name: 'Breathing', speed: 0.6, blankChance: 0.40 },
-            { name: 'Waves', speed: 0.8, blankChance: 0.30 },
-            { name: 'Sparse', speed: 0.5, blankChance: 0.70 },
-            { name: 'Dense', speed: 1.0, blankChance: 0.05 },
-            { name: 'Energetic', speed: 1.5, blankChance: 0.50 },
-            { name: 'Glitch', speed: 2.0, blankChance: 0.60 }
+            { name: 'Calm', speed: 0.3, changeRate: 0.1 },
+            { name: 'Breathing', speed: 0.6, changeRate: 0.2 },
+            { name: 'Waves', speed: 0.8, changeRate: 0.3 },
+            { name: 'Sparse', speed: 0.5, changeRate: 0.15 },
+            { name: 'Dense', speed: 1.0, changeRate: 0.4 },
+            { name: 'Energetic', speed: 1.5, changeRate: 0.5 },
+            { name: 'Glitch', speed: 2.0, changeRate: 0.7 }
         ];
         
-        // Resize canvas to fullscreen
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             calculateLayout();
         }
         
-        // Calculate grid layout
         function calculateLayout() {
             cols = Math.max(1, Math.ceil(Math.sqrt(cellCount)));
             rows = Math.ceil(cellCount / cols);
-            
             const cellWidth = Math.floor(canvas.width / cols);
             const cellHeight = Math.floor(canvas.height / rows);
             cellSize = Math.min(cellWidth, cellHeight) * scale;
-            
             updateInfo();
         }
         
-        // Load images
+        // Load images progressively in batches
         async function loadImages() {
             let loaded = 0;
-            const loadPromises = [];
             
+            // Pre-create image objects
             for (let i = 1; i <= TOTAL_IMAGES; i++) {
-                const promise = new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        loaded++;
-                        document.getElementById('loadProgress').textContent = `${loaded} / 230 images`;
-                        resolve(img);
-                    };
-                    img.onerror = () => {
-                        loaded++;
-                        document.getElementById('loadProgress').textContent = `${loaded} / 230 images`;
-                        resolve(null);
-                    };
-                    img.src = `images/blue-${i}.jpg`;
-                    images.push(img);
-                });
-                loadPromises.push(promise);
+                images[i - 1] = null;
             }
             
-            await Promise.all(loadPromises);
-            console.log(`Loaded ${images.filter(img => img && img.complete).length} images`);
+            // Load in batches
+            for (let batch = 0; batch < Math.ceil(TOTAL_IMAGES / BATCH_SIZE); batch++) {
+                const start = batch * BATCH_SIZE + 1;
+                const end = Math.min((batch + 1) * BATCH_SIZE, TOTAL_IMAGES);
+                
+                const promises = [];
+                for (let i = start; i <= end; i++) {
+                    const idx = i - 1;
+                    promises.push(new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            images[idx] = img;
+                            loadedImages.add(idx);
+                            loaded++;
+                            const percent = Math.floor((loaded / TOTAL_IMAGES) * 100);
+                            document.getElementById('loadProgress').textContent = percent + '%';
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            loaded++;
+                            resolve();
+                        };
+                        img.src = `images/blue-${i}.jpg`;
+                    }));
+                }
+                
+                await Promise.all(promises);
+                
+                // Start animation after first batch
+                if (batch === 0 && !grid.length) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('info').style.display = 'block';
+                    document.getElementById('controls').style.display = 'block';
+                    initializeGrid();
+                    animate();
+                }
+            }
             
-            // Hide loading screen
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('info').style.display = 'block';
-            document.getElementById('controls').style.display = 'block';
-            
-            initializeGrid();
+            console.log(`Loaded ${loadedImages.size} images`);
         }
         
-        // Initialize grid
         function initializeGrid() {
             grid = [];
             for (let i = 0; i < cellCount; i++) {
@@ -198,49 +156,38 @@
             }
         }
         
-        // Update grid for Mode 1 (Uniform - all change together)
         function updateUniform() {
             const now = Date.now();
             if (now - lastBeatTime >= beatInterval / animationSpeed) {
                 lastBeatTime = now;
                 beatCount++;
                 
-                // Every 8 beats, change all cells
                 if (beatCount % 8 === 0) {
                     for (let cell of grid) {
                         cell.imageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
                     }
                 }
-                
                 updateInfo();
             }
         }
         
-        // Update grid for Mode 2 (Random)
         function updateRandom() {
             const now = Date.now();
             if (now - lastBeatTime >= beatInterval / (animationSpeed * presets[currentPreset].speed)) {
                 lastBeatTime = now;
                 beatCount++;
                 
-                // Randomly change cells based on preset
                 const preset = presets[currentPreset];
                 for (let cell of grid) {
-                    if (Math.random() > 0.8) { // 20% chance per beat
-                        if (Math.random() < preset.blankChance) {
-                            cell.visible = false;
-                        } else {
-                            cell.imageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
-                            cell.visible = true;
-                        }
+                    if (Math.random() < preset.changeRate) {
+                        cell.imageIndex = Math.floor(Math.random() * TOTAL_IMAGES);
+                        cell.visible = Math.random() > 0.1; // 10% blank chance
                     }
                 }
-                
                 updateInfo();
             }
         }
         
-        // Draw grid
         function draw() {
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -248,9 +195,9 @@
             const offsetX = (canvas.width - (cellSize * cols)) / 2;
             const offsetY = (canvas.height - (cellSize * rows)) / 2;
             
-            for (let i = 0; i < grid.length; i++) {
+            for (let i = 0; i < grid.length && i < cellCount; i++) {
                 const cell = grid[i];
-                if (!cell.visible || !showImages) continue;
+                if (!cell.visible) continue;
                 
                 const col = i % cols;
                 const row = Math.floor(i / cols);
@@ -258,35 +205,28 @@
                 const y = offsetY + (row * cellSize);
                 
                 const img = images[cell.imageIndex];
-                if (img && img.complete) {
+                if (img) {
                     ctx.drawImage(img, x, y, cellSize, cellSize);
                 }
             }
         }
         
-        // Animation loop
         function animate() {
             if (!paused) {
-                if (mode === 1) {
-                    updateUniform();
-                } else {
-                    updateRandom();
-                }
+                if (mode === 1) updateUniform();
+                else updateRandom();
             }
             draw();
             requestAnimationFrame(animate);
         }
         
-        // Update info display
         function updateInfo() {
             document.getElementById('mode').textContent = mode === 1 ? 'Uniform' : 'Random';
             document.getElementById('preset').textContent = mode === 2 ? presets[currentPreset].name : '-';
             document.getElementById('cells').textContent = cellCount;
             document.getElementById('beat').textContent = `${(beatCount % 8) + 1}/8`;
-            document.getElementById('bpm').textContent = bpm;
         }
         
-        // Keyboard controls
         document.addEventListener('keydown', (e) => {
             switch(e.key.toLowerCase()) {
                 case 'm':
@@ -294,14 +234,8 @@
                     beatCount = 0;
                     updateInfo();
                     break;
-                case 'b':
-                    beatDetection = !beatDetection;
-                    break;
                 case 'p':
                     paused = !paused;
-                    break;
-                case 'i':
-                    showImages = !showImages;
                     break;
                 case 'arrowleft':
                     if (mode === 2) {
@@ -316,10 +250,10 @@
                     }
                     break;
                 case 'arrowup':
-                    animationSpeed = Math.min(5.0, animationSpeed + 0.1);
+                    animationSpeed = Math.min(5.0, animationSpeed + 0.2);
                     break;
                 case 'arrowdown':
-                    animationSpeed = Math.max(0.1, animationSpeed - 0.1);
+                    animationSpeed = Math.max(0.1, animationSpeed - 0.2);
                     break;
                 case '+':
                 case '=':
@@ -328,7 +262,7 @@
                     break;
                 case '-':
                 case '_':
-                    scale = Math.max(0.5, scale - 0.1);
+                    scale = Math.max(0.3, scale - 0.1);
                     calculateLayout();
                     break;
                 case '1': case '2': case '3': case '4': case '5': case '6': case '7':
@@ -340,26 +274,27 @@
             }
         });
         
-        // Mouse wheel for grid size
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (e.deltaY < 0) {
-                cellCount = Math.min(1000, cellCount + 4);
+                cellCount = Math.min(400, cellCount + 4);
             } else {
-                cellCount = Math.max(1, cellCount - 4);
+                cellCount = Math.max(4, cellCount - 4);
             }
-            initializeGrid();
+            while (grid.length < cellCount) {
+                grid.push({
+                    imageIndex: Math.floor(Math.random() * TOTAL_IMAGES),
+                    visible: true
+                });
+            }
+            grid.length = cellCount;
             calculateLayout();
         });
         
-        // Window resize
         window.addEventListener('resize', resizeCanvas);
         
-        // Initialize
         resizeCanvas();
-        loadImages().then(() => {
-            animate();
-        });
+        loadImages();
     </script>
 </body>
 </html>

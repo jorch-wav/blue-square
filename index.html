@@ -115,55 +115,25 @@
         }
         
         async function loadImages() {
-            // Load first 10 images immediately to start faster
-            const initialPromises = [];
-            for (let i = 1; i <= 10; i++) {
-                const idx = i - 1;
-                initialPromises.push(new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        images[idx] = img;
-                        loadedImages.add(idx);
-                        document.getElementById('loadProgress').textContent = Math.floor(((i / TOTAL_IMAGES) * 100)) + '%';
-                        resolve();
-                    };
-                    img.onerror = () => resolve();
-                    img.src = `images/blue-${i}.jpg`;
-                }));
-            }
-            
-            await Promise.all(initialPromises);
-            
-            // Start the app immediately
+            // Start app immediately - no waiting for images
             document.getElementById('loading').style.display = 'none';
             document.getElementById('info').style.display = 'block';
             document.getElementById('controls').style.display = 'block';
             initializeGrid();
             animate();
             
-            // Continue loading rest in background
-            let loaded = 10;
-            for (let batch = 1; batch < Math.ceil(TOTAL_IMAGES / BATCH_SIZE); batch++) {
-                const start = batch * BATCH_SIZE + 1;
-                const end = Math.min((batch + 1) * BATCH_SIZE, TOTAL_IMAGES);
-                
-                const promises = [];
-                for (let i = start; i <= end; i++) {
-                    const idx = i - 1;
-                    promises.push(new Promise((resolve) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            images[idx] = img;
-                            loadedImages.add(idx);
-                            loaded++;
-                            resolve();
-                        };
-                        img.onerror = () => { loaded++; resolve(); };
-                        img.src = `images/blue-${i}.jpg`;
-                    }));
-                }
-                
-                await Promise.all(promises);
+            // Load images in background
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                const idx = i - 1;
+                const img = new Image();
+                img.onload = () => {
+                    images[idx] = img;
+                    loadedImages.add(idx);
+                };
+                img.onerror = () => {
+                    console.log(`Failed to load image ${i}`);
+                };
+                img.src = `images/blue-${i}.jpg`;
             }
         }
         
@@ -282,14 +252,18 @@
                     const x = offsetX + (col * cellSize);
                     const y = offsetY + (row * cellSize);
                     
-                    if (uniformTransitioning && oldImg && newImg) {
+                    if (uniformTransitioning && loadedImages.has(uniformImage) && loadedImages.has(nextUniformImage)) {
                         ctx.globalAlpha = 1.0 - uniformTransitionProgress;
                         ctx.drawImage(oldImg, x, y, cellSize, cellSize);
                         ctx.globalAlpha = uniformTransitionProgress;
                         ctx.drawImage(newImg, x, y, cellSize, cellSize);
                         ctx.globalAlpha = 1.0;
-                    } else if (oldImg) {
+                    } else if (loadedImages.has(uniformImage)) {
                         ctx.drawImage(oldImg, x, y, cellSize, cellSize);
+                    } else {
+                        // Show blue placeholder
+                        ctx.fillStyle = '#4169e1';
+                        ctx.fillRect(x, y, cellSize, cellSize);
                     }
                 }
             } else {
@@ -302,9 +276,9 @@
                     const y = offsetY + (row * cellSize);
                     
                     if (!cell.visible) {
-                        if (backgroundImage !== null) {
+                        if (backgroundImage !== null && loadedImages.has(backgroundImage)) {
                             const bgImg = images[backgroundImage];
-                            if (bgImg) ctx.drawImage(bgImg, x, y, cellSize, cellSize);
+                            ctx.drawImage(bgImg, x, y, cellSize, cellSize);
                         }
                         continue;
                     }
@@ -312,18 +286,29 @@
                     if (cell.transitioning) {
                         const oldImg = images[cell.imageIndex];
                         const newImg = images[cell.nextImageIndex];
-                        if (oldImg) {
+                        if (loadedImages.has(cell.imageIndex)) {
                             ctx.globalAlpha = 1.0 - cell.transitionProgress;
                             ctx.drawImage(oldImg, x, y, cellSize, cellSize);
                         }
-                        if (newImg) {
+                        if (loadedImages.has(cell.nextImageIndex)) {
                             ctx.globalAlpha = cell.transitionProgress;
                             ctx.drawImage(newImg, x, y, cellSize, cellSize);
                         }
+                        if (!loadedImages.has(cell.imageIndex) && !loadedImages.has(cell.nextImageIndex)) {
+                            // Show blue placeholder
+                            ctx.fillStyle = '#4169e1';
+                            ctx.fillRect(x, y, cellSize, cellSize);
+                        }
                         ctx.globalAlpha = 1.0;
                     } else {
-                        const img = images[cell.imageIndex];
-                        if (img) ctx.drawImage(img, x, y, cellSize, cellSize);
+                        if (loadedImages.has(cell.imageIndex)) {
+                            const img = images[cell.imageIndex];
+                            ctx.drawImage(img, x, y, cellSize, cellSize);
+                        } else {
+                            // Show blue placeholder
+                            ctx.fillStyle = '#4169e1';
+                            ctx.fillRect(x, y, cellSize, cellSize);
+                        }
                     }
                 }
             }
